@@ -1,0 +1,51 @@
+Specifiche
+
+Scenario
+
+Si ha un insieme di n utenti, distribuiti in una area geografica di piccole dimensioni, dotati
+
+ciascuno di un dispositivo Wi­Fi, e desiderano connettersi fra di loro.
+
+Si possiede un insieme m di droni, ciascuno dotato di sistemi wireless (es. Access Point) a cui i
+
+dispositivi degli utenti possono connettersi per creare una rete.
+
+I droni si devono connettere tra di loro creando una rete wireless ad­hoc e posizionarsi nello spazio
+
+(assi x,y,z) sopra gli utenti in modo da ottimizzare uno o più parametri della rete risultante (es:
+
+massimizzare copertura della rete, la banda, ecc).
+
+Vi è una unità centrale a terra (una sorta di “torre di controllo”) che si occupa di calcolare la
+
+posizione dei droni risolvendo un modello MILP, aggiornandoli periodicamente o qualora si
+
+verificassero determinati eventi esterni.
+
+
+Schema
+
+Gli utenti possono essere visti come punti fissi (dotati di coordinate) in uno spazio bidimensionale.
+
+La rete wireless ad­hoc viene rappresentata come un grafo: i droni sono i nodi, mentre le
+
+connessioni drone­drone o utente­drone sono gli archi. Gli archi sono le variabili del problema,
+
+possono rappresentare la presenza/assenza di connessione tra due particolari nodi, il costo di
+
+trasmissione o alcuni parametri della connessione stessa.
+
+Il modello può essere visto come un problema di flusso multi­commodity.
+
+
+Al momento vengono trascurati certi aspetti “reali”:
+
+• specifiche dei droni e loro capacità di volo (es: velocità massima, autonomia, limiti di
+
+virata, ecc)
+
+• Il controllo di collision­avoidance fra droni, la necessità di ricarica e la coordinazione del
+
+loro volo in uno “stormo”.
+
+• QoS della rete
