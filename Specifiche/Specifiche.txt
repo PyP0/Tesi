@@ -18,7 +18,7 @@ massimizzare copertura della rete, la banda, ecc).
 
 Vi è una unità centrale a terra (una sorta di “torre di controllo”) che si occupa di calcolare la
 
-posizione dei droni risolvendo un modello MILP, aggiornandoli periodicamente o qualora si
+posizione dei droni risolvendo un modello LP, aggiornandoli periodicamente o qualora si
 
 verificassero determinati eventi esterni.
 
