@@ -1,5 +1,5 @@
 CC = g++
-CPPFLAGS = -g -Wall -O2
+CPPFLAGS = -g -Wall -O2 -std=c++0x
 LDFLAGS =
 
 CPX_INCDIR  = /opt/CPLEX_Studio/cplex/include
