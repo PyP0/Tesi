@@ -4,12 +4,10 @@
 #include <fstream>
 #include <unordered_map>
 #include <algorithm>
-#include <chrono>
 
 #include <map> 
 
 using namespace std;
-using namespace std::chrono;
 
 //numero di utenti
 int n = 0;
@@ -19,7 +17,7 @@ int d = 0;
 int P = 0;
 
 int totalNodes = n + d;
-int totalPotentialNodes = n + P;
+int totalPotentialNodes = P;
 
 //numero di commodities, ovvero numero di coppie distinte sorgente-destinazione
 int K = n*(n - 1);
@@ -46,15 +44,16 @@ map<int, nodesCoordinates_t> mapGrid;
 
 std::vector< std::vector< std::vector<double> > > c(totalPotentialNodes, std::vector< std::vector<double> >(totalPotentialNodes, std::vector<double>(K, DISCONNECTED_COST)));
 
-//matrice di capacità degli archi
-std::vector< std::vector<double> > u(totalPotentialNodes, std::vector<double>(totalPotentialNodes));
-
 //matrice bilanciamento flussi
 std::vector< std::vector<double> > b(totalPotentialNodes, std::vector<double>(K, 0));
 
 std::vector<double> deployCost(P, 50); //costo deployment drone
 
 std::vector< std::vector<int> > t(n, std::vector<int>(n, -1)); //matrice di traffico
+
+std::vector< int > txCapacity();
+
+std::vector< int > rxCapacity(); 
 
 int getUsrsNum()
 {
@@ -223,7 +222,7 @@ static int placeUsersSere()
 				grid[chosenValue].isUser = true;
 				grid[chosenValue].id = i;
 
-				cout << chosenValue << " " << grid[chosenValue].id << " " << grid[chosenValue].x << " " << grid[chosenValue].y << endl;
+				//cout << chosenValue << " " << grid[chosenValue].id << " " << grid[chosenValue].x << " " << grid[chosenValue].y << endl;
 				
 				//cout << "Ho scelto il nodo: " << chosenIndex << " " << chosenValue << " " << grid[chosenValue].x << " " << grid[chosenValue].y << endl;
 				if (nodeRadius >= step)
@@ -343,8 +342,6 @@ static int createGrid()
 				rows++;
 				yCoord += step;
 			}
-			
-
 			return 0;
 		}
 		catch (exception &e)
@@ -367,7 +364,7 @@ static int initDataStructures(int n, int d, int P)
 	if (n > 0 && d > 0 && P > 0)
 	{
 		totalNodes = n + d;
-		totalPotentialNodes =  n + P;
+		totalPotentialNodes =  P;
 		K = n*(n - 1);
 
 		try
@@ -391,13 +388,6 @@ static int initDataStructures(int n, int d, int P)
 				{
 					c[i][j].resize(K, DISCONNECTED_COST);
 				}
-			}
-
-			//matrice (n+P)x(n+P), init=-1
-			u.resize(totalPotentialNodes);
-			for (int i = 0; i < totalPotentialNodes; i++)
-			{
-				u[i].resize(totalPotentialNodes, -1);
 			}
 
 			//matrice (n+P)x(K), init=0
@@ -486,19 +476,20 @@ static void randomizeDeployCost(double minVal, double maxVal)
 
 }
 
-static int createRandomInstance(int users, int drones, int positions, int tInf, int tSup, double cInf, double cSup, double dInf, double dSup, int gridLength, int gridHeight, int gridStep, string filename)
+static int createRandomInstance(int users, int drones, int tInf, int tSup, double cInf, double cSup, double dInf, double dSup, int gridLength, int gridHeight, int gridStep, string filename)
 {
 	int result=0;
 	
-	if(users > 0 && drones > 0 && positions > 0 && gridLength > 0 && gridHeight >0 && gridStep >0)
+	if(users > 0 && drones > 0 && gridLength > 0 && gridHeight >0 && gridStep >0 && (users < gridLength*gridHeight) )
 	{
 		n=users;
 		d=drones;
-		P=positions;  
+		
 		length = gridLength;
 		height = gridHeight;
+		P= length*height;  
 		step = gridStep; 
-		result= initDataStructures(users,drones,positions);
+		result= initDataStructures(users,drones,gridLength*gridHeight);
 		if(result==0)
 		{
 			//TODO
@@ -521,15 +512,6 @@ static int createRandomInstance(int users, int drones, int positions, int tInf, 
 				randomizeCosts(cInf,cSup,nodeRadius);
 				randomizeDeployCost(dInf,dSup);
 
-				//TODO: per l'amor d'iddio rimuovere assolutamente!!!!!
-				for(unsigned int i=0;i<u.size();i++)
-				{
-					for(unsigned int j=0; j<u[0].size();j++)
-					{
-						u[i][j]=1;
-					}
-				}
-
 				convertIntoBMatrix();
 				saveInstance(filename.c_str());
 			}
@@ -551,29 +533,36 @@ static int createRandomInstance(int users, int drones, int positions, int tInf, 
 	return result;
 }
 
-
-int createBatchInstances(int instQuantity, vector<int> users, vector<int> drones, vector<int> positions, vector<int> gridLength, vector<int> gridHeight, vector<int> gridStep, int tInf, int tSup, double cInf, double cSup, double dInf, double dSup, string instRootName)
+int createBatchInstances(int instQuantity, vector<int> users, vector<int> drones, vector<int> gridLength, vector<int> gridHeight, vector<int> gridStep, int tInf, int tSup, double cInf, double cSup, double dInf, double dSup, string instRootName)
 {
-	if ((instQuantity > 0)) //&& (users.size() == drones.size() && drones.size() == positions.size() && positions.size() == gridLength.size() && gridLength.size() == gridHeight.size() && gridHeight.size() == gridStep.size()))
+	if (instQuantity > 0) //&& (users.size() == drones.size() && drones.size() == positions.size() && positions.size() == gridLength.size() && gridLength.size() == gridHeight.size() && gridHeight.size() == gridStep.size()))
 	{
 		int result = 0;
 		ofstream file;
-		file.open(MASTER_FILE, ios::out);
+		string fileName(INSTANCE_PATH);
+		fileName = fileName + MASTER_FILE;
+		file.open(fileName, ios::out);
 		if (file.is_open())
 		{
-			for (unsigned int i = 0; i<users.size(); i++) //TODO: completare con gli altri cicli annidati
+			for (unsigned int i = 0; i < users.size(); i++) 
 			{
-				for (int j = 0; j<instQuantity; j++)
+				for (unsigned int l = 0; l < drones.size(); l++)
 				{
-					string composeName = INSTANCE_PATH + instRootName + "_i" + to_string(j) + "_u" + to_string(users[i]) + "_d" + to_string(drones[i]) + "_p" + to_string(positions[i]) + ".txt";
-					result = createRandomInstance(users[i], drones[i], positions[i], tInf, tSup, cInf, cSup, dInf, dSup, gridLength[i], gridHeight[i], gridStep[i], composeName);
-					if (result != 0)
+					for (unsigned int k = 0; k < gridLength.size(); k++)
 					{
-						cerr << __FUNCTION__ << "(): Errore nella creazione di una istanza." << endl;
-						file.close();
-						return 1;
+						for (int j = 0; j < instQuantity; j++)
+						{
+							string composeName = INSTANCE_PATH + instRootName + "_i" + to_string(j) + "_u" + to_string(users[i]) + "_d" + to_string(drones[l]) + "_p" + to_string(gridHeight[k] * gridLength[k]) + ".txt";
+							result = createRandomInstance(users[i], drones[l], tInf, tSup, cInf, cSup, dInf, dSup, gridLength[k], gridHeight[k], gridStep[k], composeName);
+							if (result != 0)
+							{
+								cerr << __FUNCTION__ << "(): Errore nella creazione di una istanza." << endl;
+								result = 1;
+							}
+							else
+								file << composeName << endl;
+						}
 					}
-					file << composeName << endl;
 				}
 			}
 			file.close();
@@ -584,20 +573,18 @@ int createBatchInstances(int instQuantity, vector<int> users, vector<int> drones
 			cerr << __FUNCTION__ << "(): Impossibile aprire il file: " << file << endl;
 			return 1;
 		}
-
 	}
 	else
 	{
 		cerr << __FUNCTION__ << "(): Uno o piu' parametri errati." << endl;
 		return 1;
 	}
-
 }
 
 int saveInstance(const char *filename)
 {
 	int status = 0;
-	if (n > 0 && d > 0 && P>0)
+	if (n > 0 && d > 0 && P > 0)
 	{
 		ofstream file;
 		file.open(filename, ios::out);
@@ -630,25 +617,21 @@ int saveInstance(const char *filename)
 				file << endl;
 			}
 
-			for (unsigned int i = 0; i < u.size(); i++)
-			{
-				for (unsigned int j = 0; j < u[0].size(); j++)
-				{
-					file << u[i][j] << " ";
-				}
-				file << endl;
-			}
-
 			for (unsigned int i = 0; i < c.size(); i++)
 			{
 				for (unsigned int j = 0; j < c[0].size(); j++)
 				{
+					int counter = 0;
 					for (unsigned int k = 0; k < c[0][0].size(); k++)
 					{
 						if(c[i][j][k] >= threshold)
-							file << -1 << " ";
+							counter++;
 						else
 							file << c[i][j][k] << " ";
+					}
+					if(counter == c[0][0].size())
+					{
+						file << -1;
 					}
 					file << endl;
 				}
@@ -698,7 +681,7 @@ int loadInstance(const char *filename) //TODO: controlli su possibile istanza co
 			file >> n >> d >> P;
 
 			totalNodes = n + d;
-			totalPotentialNodes =  n + P;
+			totalPotentialNodes =  P;
 
 			file >> s >> threshold >> droneTXCapacity;
 			file >> droneRXCapacity >> nodeRadius;
@@ -720,23 +703,24 @@ int loadInstance(const char *filename) //TODO: controlli su possibile istanza co
 						}
 					}
 
-					for (unsigned int i = 0; i < u.size(); i++)
-					{
-						for (unsigned int j = 0; j < u[0].size(); j++)
-						{
-							file >> u[i][j];
-						}
-					}
-
 					for (unsigned int i = 0; i < c.size(); i++)
 					{
 						for (unsigned int j = 0; j < c[0].size(); j++)
 						{
-							for (unsigned int k = 0; k < c[0][0].size(); k++)
+							file >> c[i][j][0];
+							if(c[i][j][0] == -1)
 							{
-								file >> c[i][j][k];
-								if(c[i][j][k] == -1)
+								for (unsigned int k = 0; k < c[0][0].size(); k++)
+								{
 									c[i][j][k]= DISCONNECTED_COST;
+								}
+							}
+							else
+							{
+								for (unsigned int k = 1; k < c[0][0].size(); k++)
+								{
+									file >> c[i][j][k];
+								}
 							}
 						}
 					}
@@ -752,7 +736,8 @@ int loadInstance(const char *filename) //TODO: controlli su possibile istanza co
 						file >> mapGrid[index].y;
 					}
 
-					 std::map<int,nodesCoordinates_t>::iterator it = mapGrid.begin();
+					//debug
+					/*std::map<int,nodesCoordinates_t>::iterator it = mapGrid.begin();
 					for (it=mapGrid.begin(); it!=mapGrid.end(); ++it)
     				{	
     					cout << it->first << ")" << endl;
@@ -760,11 +745,11 @@ int loadInstance(const char *filename) //TODO: controlli su possibile istanza co
     					cout << it->second.isUser << '\n';
     					cout << it->second.x << ' ';
     					cout << it->second.y << '\n';
-    				}
+    				}*/
 					convertIntoBMatrix();
 
 					//debug
-					for(int i=0; i< totalPotentialNodes;i++)
+					/*for(int i=0; i< totalPotentialNodes;i++)
 					{
 						cout << mapGrid[i].id << " can reach: ";
 						for(int j=0; j< totalPotentialNodes; j++)
@@ -779,7 +764,7 @@ int loadInstance(const char *filename) //TODO: controlli su possibile istanza co
 							}
 						}
 						cout << endl;
-					}
+					}*/
 				}
 				else
 				{
@@ -806,68 +791,6 @@ int loadInstance(const char *filename) //TODO: controlli su possibile istanza co
 		result = 1;
 	}
 	return result;
-}
-
-static void setCompleteGraph(double stdCost, int stdCap)
-{
-	if (c.size() > 0 && u.size() > 0)
-	{
-		for (unsigned int i = n; i < c.size(); i++)
-		{
-			for (unsigned int j = n; j < c[0].size(); j++)
-			{
-				if (i != j)
-				{
-					for (unsigned int k = 0; k < c[0][0].size(); k++)
-					{
-						c[i][j][k] = stdCost;
-					}
-					u[i][j] = stdCap;
-				}
-			}
-		}
-	}
-	else
-	{
-		cerr << __FUNCTION__ << "(): Strutture dati non allocate." << endl;
-	}
-}
-
-static void setCostsByRadius(int xPos, int yPos, int xMax, int yMax, int radius, float cost)
-{
-	int yStart, yEnd, xStart, xEnd;
-	
-	if(xPos-radius <0)
-		xStart= xPos;
-	else
-		xStart= xPos-radius;
-
-	if(yPos-radius <0)
-		yStart= yPos;
-	else
-		yStart= yPos-radius;
-
-	if(xPos+radius >xMax)
-		xEnd= xPos;
-	else
-		xEnd= xPos+radius;
-
-	if(yPos+radius >yMax)
-		yEnd= yPos;
-	else
-		yEnd= yPos+radius;
-
-	for(int y= yStart; y<= yEnd ; y++)
-	{
-		for(int x=xStart; x<= xEnd;x++)
-		{
-			for(int k=0;k<K;k++)
-			{
-				c[x][y][k]= cost;
-			}
-		}
-
-	}
 }
 
 void printGrid()
@@ -901,6 +824,26 @@ void printBuckets(unordered_map<int, int> mymap)
 
 }
 
+void printTrafficMatrix()
+{
+	cout << "\t";
+	for(unsigned int i = 0; i< t[0].size(); i++)
+	{
+		cout << i << "\t";
+	}
+	cout << endl;
+
+	for(unsigned int i = 0; i< t.size(); i++)
+	{
+		cout << i << ")\t";
+		for(unsigned int j = 0; j< t[0].size(); j++)
+		{
+			cout << t[i][j] << "\t";
+		}
+		cout << endl;
+	}
+	cout << endl;
+}
 
 void printNodesIOFlow()
 {

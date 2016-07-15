@@ -6,7 +6,7 @@
 #include <string>
 #include <vector>
 
-#define MASTER_SOLUTIONS_FILE "../instances/master_solutions.txt"
+#define MASTER_SOLUTIONS_FILE "master_solutions.txt"
 
 struct solution_t
 {
@@ -22,9 +22,10 @@ void printVarsValue(CEnv, Prob);
 //solution_t *getSolution(CEnv, Prob);
 void printSolution(solution_t*);
 void printConflictFile(std::string,CEnv,Prob);
-solution_t *solveLP(CEnv,Prob,std::string); 
-void printNetworkUsage(CEnv,Prob);
+solution_t *solveLP(CEnv,Prob,std::string,bool); 
+//void printNetworkUsage(CEnv,Prob);
 void printSimplifiedSolFile(CEnv,Prob,const char*);
 int testSolutionFile(const char *,const char *);
+int interfaceToGraphicModule(CEnv,Prob,std::string);
 
 #endif

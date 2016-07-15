@@ -7,8 +7,8 @@
 #include <map>
 
 #define DISCONNECTED_COST CPX_INFBOUND
-#define INSTANCE_PATH "../instances/"
-#define MASTER_FILE "../instances/master.txt"
+#define INSTANCE_PATH "../instanc3es/"
+#define MASTER_FILE "master.txt"
 
 //test coordinate discrete su griglia
 struct nodesCoordinates_t
@@ -51,13 +51,15 @@ int getMaxConnections();
 int getTotalPotentialNodes();
 int getTotalNodes();
 
+
 double getDistanceCoef(int,int);
 double getInterferenceFactor(int, int);
 void printNodesIOFlow();
 void printGrid();
+void printTrafficMatrix();
 void printBuckets(std::unordered_map<int,int>);
 int saveInstance(const char *);
 int loadInstance(const char *);
-int createBatchInstances(int,std::vector<int>,std::vector<int>,std::vector<int>,std::vector<int>,std::vector<int>,std::vector<int>,int,int,double,double,double,double,std::string);
+int createBatchInstances(int,std::vector<int>,std::vector<int>,std::vector<int>,std::vector<int>,std::vector<int>,int,int,double,double,double,double,std::string);
 
 #endif

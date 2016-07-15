@@ -6,10 +6,12 @@
 #include <fstream>
 #include <time.h>
 #include <string>
+#include <math.h>
 #include "cpxmacro.h"
 #include "instance.h"
 #include "utility.h"
 #include "lpsolver.h"
+
 
 using namespace std;
 
@@ -51,9 +53,13 @@ solution_t *executeInstance(string fileName, bool verbose)
 	solution_t *instSolution = NULL;
 	
 	// init
+
 	DECL_ENV(env);
 	DECL_PROB(env, lp);
-	CPXsetintparam(env, CPX_PARAM_CONFLICTDISPLAY, 2);
+	
+	if(!CPXsetintparam(env, CPX_PARAM_CONFLICTDISPLAY, 2) || !CPXsetintparam(env,CPX_PARAM_TILIM, 600.0))
+		cerr << __FUNCTION__ << "(): Non e' stato possibile settare i parametri CPLEX desiderati." << endl;
+
 
 	string baseFileName (fileName);
 	string instance = baseFileName;
@@ -68,18 +74,20 @@ solution_t *executeInstance(string fileName, bool verbose)
 	}
 	else
 	{
+		cout << "Instance " << instance << " loaded." << endl;
 		if(verbose == true)
 		{
-			cout << "Instance " << instance << " loaded." << endl;
+			
 			cout << "Users: " << getUsrsNum() << endl;
 			cout << "Drones: " << getDrnsNum() << endl;
 			cout << "Potential drones positions: " << getPosNum() << endl << endl;
-			printNodesIOFlow();
+			//printNodesIOFlow();
+			printTrafficMatrix();
 		}
 
 		try
 		{
-			instSolution = solveLP(env, lp, instance);
+			instSolution = solveLP(env, lp, instance, verbose);
 			if(instSolution != NULL)
 			{
 				cout << "Status code: " << instSolution->statusCode << endl;
@@ -92,7 +100,6 @@ solution_t *executeInstance(string fileName, bool verbose)
 				else
 				{
 					//printSolutionData(env, lp, y_index, solution);
-
 					if(verbose == true)
 					{
 						printSimplifiedSolFile(env, lp, solution.c_str());
@@ -105,9 +112,13 @@ solution_t *executeInstance(string fileName, bool verbose)
 					if (instSolution == NULL)
 						cerr << __FUNCTION__ << "(): Impossibile salvare la soluzione dell'istanza risolta." << endl;
 					else
-						printSolution(instSolution);
+					{
+						if(verbose == true)
+							printSolution(instSolution);
+					}
 
-					CHECKED_CPX_CALL(CPXsolwrite, env, lp, solFile.c_str());
+					if(verbose == true)
+						CHECKED_CPX_CALL(CPXsolwrite, env, lp, solFile.c_str());
 				}
 			}
 
@@ -127,7 +138,7 @@ solution_t *executeInstance(string fileName, bool verbose)
 
 }
 
-int executeMaster(vector< string > fileList, string masterSolutionsFile)
+int executeMaster(vector< string > fileList, string masterSolutionsFile, bool verbose)
 {
 	int globalStatus = 0;
 	solution_t *instSolution = NULL;
@@ -143,17 +154,27 @@ int executeMaster(vector< string > fileList, string masterSolutionsFile)
 
 		for(unsigned int i = 0; i < fileList.size(); i++)
 		{
-			instSolution = executeInstance(fileList[i],false);
+			instSolution = executeInstance(fileList[i],verbose);
 			if(instSolution == NULL)  //check solution status
 				globalStatus = 1;
 			else
 			{
 				if(file.is_open())
 				{
+					int dronesCount = 0;
+					for(unsigned int i = 0; i < instSolution->yPositions.size(); i++)
+					{
+						if (round(instSolution->yPositions[i]) == 1)
+						{
+							dronesCount++;
+						}
+					}
 					//remove the ../instances/
 					file << instSolution->instName.substr(13,string::npos) << "\t";
 					file << instSolution->objValue << "\t";
-					file << instSolution->execTime << endl;
+					file << instSolution->execTime << "\t";
+					file << dronesCount << "/" << getDrnsNum() << "\t";
+					file << instSolution->statusCode << endl;
 				}
 			}
 		}
@@ -172,13 +193,12 @@ int executeMaster(vector< string > fileList, string masterSolutionsFile)
 	return globalStatus;
 }
 
-
 int main(int argc, char const *argv[])
 {
 	//string lpFile(".lp"), solution(".txt"), instance("test4.txt"), solFile(".sol"), clpFile("conflict.clp");
 	//string lpFile("randomTest.lp"), solution("randomTest.txt"), instance("randomTest"), solFile("randomTest.sol"), clpFile("conflict.clp");
 	
-
+	bool verbose = false;
 	//srand(time(NULL)); /* seed random number generator */
 
 	
@@ -189,8 +209,23 @@ int main(int argc, char const *argv[])
 		return 0;
 	}
 	if(argc == 1)
-		//int instQuantity, vector<int> users, vector<int> drones, vector<int> positions, vector<int> gridLength, vector<int> gridHeight, vector<int> gridStep, int tInf, int tSup, double cInf, double cSup, double dInf, double dSup, string instRootName)
-		createBatchInstances(1, vector<int>(1,5),vector<int>(1,20),vector<int>(1,24),vector<int>(1,6),vector<int>(1,4),vector<int>(1,2),0,30,5,10,20,50,string("automatictest"));
+	{
+		//int instQuantity, vector<int> users, vector<int> drones, vector<int> gridLength, vector<int> gridHeight, vector<int> gridStep, int tInf, int tSup, double cInf, double cSup, double dInf, double dSup, string instRootName)
+		createBatchInstances(
+			10, //instQuantity
+			vector<int> {5}, //users
+			vector<int> {20}, //drones
+			vector<int> {4,10,10,15,20}, //gridLength
+			vector<int> {5,5,10,10,10},  //gridHeight
+			vector<int> {2,2,2,2,2},  //gridStep
+			0, 	//tInf
+			30, //tSup
+			5,	//cInf
+			10, //cSup
+			100, //dInf
+			200, //dSup
+			string("automatictest"));
+	}
 	else
 	{
 		/*solution_t *instSolution=NULL;
@@ -202,8 +237,21 @@ int main(int argc, char const *argv[])
 
 		if(string(argv[1]).compare(string("-a")) == 0)
 		{
-			int status = executeMaster(loadFileList(MASTER_FILE), MASTER_SOLUTIONS_FILE);
-			return status;
+			if(argc == 3)
+			{
+				string pathToMaster(argv[2]);
+				pathToMaster = pathToMaster + MASTER_FILE;
+
+				string pathToMasterSolFile(argv[2]);
+				pathToMasterSolFile = pathToMasterSolFile + MASTER_SOLUTIONS_FILE;
+				
+				return executeMaster(loadFileList(pathToMaster.c_str()), pathToMasterSolFile.c_str(), verbose);
+			}
+			else
+			{
+				int status = executeMaster(loadFileList(MASTER_FILE), MASTER_SOLUTIONS_FILE, verbose);
+				return status;
+			}
 		}
 		else
 		{
