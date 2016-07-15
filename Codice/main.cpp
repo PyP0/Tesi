@@ -57,10 +57,9 @@ solution_t *executeInstance(string fileName, bool verbose)
 	DECL_ENV(env);
 	DECL_PROB(env, lp);
 	
-	if(!CPXsetintparam(env, CPX_PARAM_CONFLICTDISPLAY, 2) || !CPXsetintparam(env,CPX_PARAM_TILIM, 600.0))
-		cerr << __FUNCTION__ << "(): Non e' stato possibile settare i parametri CPLEX desiderati." << endl;
-
-
+	if(CPXsetintparam(env, CPX_PARAM_CONFLICTDISPLAY, 2) != 0 || CPXsetdblparam(env,CPX_PARAM_TILIM, 1800.0) != 0) //10 minutes stop 
+		cerr << __FUNCTION__ << "(): Impossibile settare uno o piu' parametri di CPLEX." << endl;
+	
 	string baseFileName (fileName);
 	string instance = baseFileName;
 	string solution = baseFileName + ".txt";
