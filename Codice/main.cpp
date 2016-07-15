@@ -1,5 +1,5 @@
 /**
-* @file modelv0.4.cpp
+* @file modelv0.6.1.cpp
 * @brief
 */
 
@@ -19,15 +19,25 @@ char errmsg[BUF_SIZE];
 
 // data
 
-int n = 4; //numero di utenti
-int d = 4; // numero di droni
-int P = 4; //numero di posizioni potenziali dei droni
+//int n = 4; //numero di utenti
+int n = 5;
+
+//int d = 4; // numero di droni
+int d = 2;
+//int P = 4; //numero di posizioni potenziali dei droni
+int P = 3;
+
+int totalNodes = n + d;
+int totalPositions = n + P;
 int K = n*(n - 1); //numero di commodities, ovvero numero di coppie distinte sorgente-destinazione
 int s = 10; //numero massimo connessioni sostenibili da un drone
 
 const int bigM = 1000; // TODO: bigM deve essere maggiore della capacità massima dei link
 const int threshold = 100;
 
+int f_index = 0;
+int y_index = 0;
+int x_index = 0;
 //int t[n][n];
 //matrice di traffico
 vector< vector<int> > t(n, vector<int>(n,-1)); //matrice di traffico
@@ -62,20 +72,21 @@ void setupLP(CEnv env, Prob lp, int *numVars)
 	//allocazione mappe
 	vector< vector< vector<int> > > fMap(n+d, vector< vector<int> >(n+d, vector<int>(K, -1)));
 	vector< vector<int> > xMap(n + d, vector<int>(n + d, -1));
-	vector< vector<int> > yMap(P, vector<int>(d, -1));
 
 	int baseDroneIndex = n;
 
 	//aggiunta delle variabili f_i_j_k, una per volta, con i!=j
 	//nota: la variabile f_i_j_k e' distinta dalla variabile f_j_i_k
 	int fMapIndex = 0;
+	int f_index = 0;
 	for (int k = 0; k < K; k++)
 	{
 		for (int i = 0; i < n+d; i++)
 		{
 			for (int j = 0; j < n+d; j++)
 			{
-				if (i != j && graph[i][j] != 0) //c'è un arco tra i nodi i e j, quindi creo la corrispondente variabile di flusso fijk
+				//if (i != j && graph[i][j] != 0) //c'è un arco tra i nodi i e j, quindi creo la corrispondente variabile di flusso fijk
+				if (i != j)
 				{
 					char ftype = 'I';
 					double lb = 0.0;
@@ -97,33 +108,29 @@ void setupLP(CEnv env, Prob lp, int *numVars)
 
 	//numerazione nodi: da 0 a n sono gli utenti, da n a n+d sono le posizioni potenziali
 
-	//inserimento delle variabili y_i_v
-	int y_index= CPXgetnumcols(env, lp);
-	int yMapIndex = y_index;
+	//inserimento delle variabili y_i
+	y_index= CPXgetnumcols(env, lp);
+	
 	for (int i = 0; i < P; i++)
 	{
-		for (int v = 0; v < d; v++)
-		{
-			char ytype = 'B';
-			double lb = 0.0;
-			double ub = 1.0;
+		char ytype = 'B';
+		double lb = 0.0;
+		double ub = 1.0;
 
-			snprintf(name, NAME_SIZE, "y_%d_%d", baseDroneIndex+i, v); //scrive il nome della variabile y_i_v sulla stringa name[]
-			char* yname = (char*)(&name[0]);
-			CHECKED_CPX_CALL(CPXnewcols, env, lp, 1, &zero, &lb, &ub, &ytype, &yname);  
+		snprintf(name, NAME_SIZE, "y_%d", baseDroneIndex+i); //scrive il nome della variabile y_i sulla stringa name[]
+		char* yname = (char*)(&name[0]);
+		CHECKED_CPX_CALL(CPXnewcols, env, lp, 1, &zero, &lb, &ub, &ytype, &yname);  
 
-			yMap[i][v] = yMapIndex;
-			yMapIndex++;
-		}
+
 	}
-	printf("Sono state create %d variabili y_i_v\n", CPXgetnumcols(env, lp)-y_index); //numero totale delle vars create	
+	printf("Sono state create %d variabili y_i\n", CPXgetnumcols(env, lp)-y_index); //numero totale delle vars create	
 
 	//aggiunta delle variabili xiv
 		
 	//si divide in due step la creazione delle variabili x_i_j
 
 	//variabili relative agli "utenti"
-	int x_index = CPXgetnumcols(env, lp);
+	x_index = CPXgetnumcols(env, lp);
 	int xMapIndex = x_index;
 
 	for (int i = 0; i < n; i++)
@@ -184,6 +191,7 @@ void setupLP(CEnv env, Prob lp, int *numVars)
 	{
 		for (int j = 0; j < n+d; j++)
 		{
+			//if (i != v && !(v < n && i < n)) //condizione più generale, include le fijv di nodi tra cui non ci sono link
 			if (i != j && graph[i][j] != 0)
 			{
 				for (int k = 0; k < K; k++)
@@ -210,7 +218,8 @@ void setupLP(CEnv env, Prob lp, int *numVars)
 		{
 			for (int i = 0; i < n+d; i++)
 			{
-				if (i != v && graph[i][v] != 0)
+				//if (i != v && graph[i][v] != 0)
+				if( i!= v && !(v < n && i < n)) //condizione più generale, include le fijv di nodi tra cui non ci sono link
 				{
 					idx.push_back(fMap[i][v][k]);
 					coef.push_back(1.0);
@@ -219,7 +228,8 @@ void setupLP(CEnv env, Prob lp, int *numVars)
 
 			for (int j = 0; j < n+d; j++)
 			{
-				if (v != j && graph[v][j] != 0)
+				//if (v != j && graph[v][j] != 0)
+				if (v != j && !(v < n && j < n)) //condizione più generale, include le fijv di nodi tra cui non ci sono link
 				{
 					idx.push_back(fMap[v][j][k]);
 					coef.push_back(-1.0);
@@ -234,7 +244,7 @@ void setupLP(CEnv env, Prob lp, int *numVars)
 	// 3. capacita' effettiva
 
 	// 4. legame tra variabili u_i_j e x_i_j
-	sense = 'L';
+	/*sense = 'L';
 	matbeg = 0;
 	for (int i = 0; i < n + d; i++)
 	{
@@ -249,9 +259,9 @@ void setupLP(CEnv env, Prob lp, int *numVars)
 				CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, 1, &u[i][j], &sense, &matbeg, &idx, &coef, NULL, NULL);
 			}
 		}
-	}
+	}*/
 
-	// 5. legame tra variabili x_i_j e y_j_v
+	// 4. legame tra variabili x_i_j e y_j
 	sense = 'L';
 	matbeg = 0;
 	coef.clear();
@@ -260,26 +270,25 @@ void setupLP(CEnv env, Prob lp, int *numVars)
 	{
 		for (int i = 0; i < n + d; i++)
 		{
-				if (i != j && graph[i][j] != 0)
-				{
-					idx.push_back(xMap[i][j]);
-					coef.push_back(1.0);
-					for (int v = 0; v < d; v++)
-					{
-						idx.push_back(y_index + ((j-n)*d) + v);
-						coef.push_back(-1.0);
-					}
-					CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idx.size(), &zero, &sense, &matbeg, &idx[0], &coef[0], NULL, NULL);
-					idx.clear();
-					coef.clear();
-				}
+			if (i != j && graph[i][j] != 0)
+			{
+				//add x_i_j
+				idx.push_back(xMap[i][j]);
+				coef.push_back(1.0);
 				
+				//add -y_j
+				idx.push_back(y_index + (j-n));
+				coef.push_back(-1.0);
+
+				CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idx.size(), &zero, &sense, &matbeg, &idx[0], &coef[0], NULL, NULL);
+				idx.clear();
+				coef.clear();
+			}		
 		}
-		
 	}
 
 	// 6. ogni nodo deve essere in grado di connettersi ad almeno un drone
-	sense = 'G';
+	/*sense = 'G';
 	matbeg = 0;
 	coef.clear();
 	idx.clear();
@@ -296,7 +305,7 @@ void setupLP(CEnv env, Prob lp, int *numVars)
 		CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idx.size(), &uno, &sense, &matbeg, &idx[0], &coef[0], NULL, NULL);
 		idx.clear();
 		coef.clear();
-	}
+	}*/
 
 
 	// 7. un drone non puo' mantenere piu' di s potenziali connessioni simultanee
@@ -320,26 +329,69 @@ void setupLP(CEnv env, Prob lp, int *numVars)
 		coef.clear();
 	}
 
+
 	// 9. non posizionare piu' di d droni
 	sense = 'L';
 	matbeg = 0;
 	coef.clear();
 	idx.clear();
 	for (int i = 0; i < P; i++)
-	{
-		for (int v = 0; v < d; v++)
-		{
-			idx.push_back(y_index + (d*i) + v);
-			coef.push_back(1.0);
-		}
+	{	
+		idx.push_back(y_index + i);
+		coef.push_back(1.0);
 	}
 	double temp_d = d;
 	CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idx.size(), &temp_d, &sense, &matbeg, &idx[0], &coef[0], NULL, NULL);
 	idx.clear();
 	coef.clear();
 
-	// 10. legame tra variabili c_i_j_k e x_i_j
-	sense = 'L';
+	// 10. legame tra variabili c_i_j_k e f_i_j_k
+	//REWORKED
+	sense = 'E';
+	for (int i = 0; i < n+d; i++)
+	{
+		for (int j = 0; j < n + d; j++)
+		{
+			//TODO: nota, se si creano solo le vars fijk tc graph[i][j]!=0, questo vincolo perde significato e non genera nuove righe
+			if (i!= j && !(j < n && i < n)) //esclude i link i cui estremi sono entrambi nodi utenti
+			{
+				for (int k = 0; k < K; k++)
+				{
+					if (c[i][j][k] > threshold)
+					{
+						double coef = 1.0;
+						int idx = fMap[i][j][k];
+						CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, 1, &zero, &sense, &matbeg, &idx, &coef, NULL, NULL);
+					}
+				}
+			}
+		}
+	}
+
+	//remove duplicate
+	/*for (int i = baseDroneIndex; i < n+d; i++)
+	{
+		for (int j = 0; j < n + d; j++)
+		{
+			if (i != j)
+			{
+				for (int k = 0; k < K; k++)
+				{
+					if (c[i][j][k] > threshold)
+					{
+						double coef = 1.0;
+						int idx = fMap[i][j][k];
+						CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, 1, &zero, &sense, &matbeg, &idx, &coef, NULL, NULL);
+
+					}
+				}
+			}
+		}
+	}*/
+
+
+
+	/*sense = 'L';
 	matbeg = 0;
 	for (int i = 0; i < n; i++)
 	{
@@ -367,8 +419,8 @@ void setupLP(CEnv env, Prob lp, int *numVars)
 
 			}
 		}
-	}
-
+	}*/
+	/*
 	// 11. in ogni posizione potenziale puo' esserci solo un drone
 	sense = 'L';
 	matbeg = 0;
@@ -402,35 +454,41 @@ void setupLP(CEnv env, Prob lp, int *numVars)
 		idx.clear();
 		coef.clear();
 	}
-
+	*/
 	// 13. legame tra le variabili x_i_j e f_i_j_k
+	//REWORKED
 	sense = 'L';
 	matbeg = 0;
-	coef.clear();
 	idx.clear();
-
+	coef.clear();
 	for (int i = 0; i < n + d; i++)
 	{
 		for (int j = 0; j < n + d; j++)
 		{
-			if (i != j && graph[i][j] != 0)
+			if (i != j)
 			{
-				for (int k = 0; k < K; k++)
+				if (!(j < n && i < n)) //esclude i link i cui estremi sono entrambi nodi utenti
 				{
-					idx.push_back(fMap[i][j][k]);
-					coef.push_back(1.0);
+					//cout << i << " " << j << " passa" << endl;
+					for (int k = 0; k < K; k++)
+					{
+						idx.push_back(fMap[i][j][k]);
+						coef.push_back(1.0);
+
+						// f_i_j_k - M * x_i_j
+						idx.push_back(xMap[i][j]);
+						coef.push_back(-bigM);
+						CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idx.size(), &zero, &sense, &matbeg, &idx[0], &coef[0], NULL, NULL);
+						idx.clear();
+						coef.clear();
+					
+					}
 				}
-				// sum(f_i_j_k) - M * x_i_j
-				idx.push_back(xMap[i][j]);
-				coef.push_back(-bigM);
-				CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idx.size(), &zero, &sense, &matbeg, &idx[0], &coef[0], NULL, NULL);
-				idx.clear();
-				coef.clear();
 			}
 		}
 	}
 
-	CHECKED_CPX_CALL(CPXwriteprob, env, lp, "flow.lp", NULL);
+	CHECKED_CPX_CALL(CPXwriteprob, env, lp, "flow2.lp", NULL);
 
 }
 
@@ -570,6 +628,40 @@ void buildAdjMatrix(double threshold)
 	}
 }
 
+//test sui file delle soluzioni
+int testSolutionFile(char *reference, char *test)
+{
+	ifstream refFile, tstFile;
+	int buf = 16, rowCount = 1, result = 0;
+	refFile.open(reference, ios::in);
+	tstFile.open(test, ios::in);
+	if (refFile.is_open() && tstFile.is_open())
+	{
+		cout << "Verifica file:" << endl;
+		char str1[buf], str2[buf];
+		while (!refFile.eof() && !tstFile.eof())
+		{
+			refFile.getline(str1, buf, '\n');
+			tstFile.getline(str2, buf, '\n');
+			if (strcmp(str1, str2) != 0)
+			{
+				cout <<"diff in row " << rowCount << ": " << str1 << " " << str2 << endl;
+				result = 1;
+			}
+			rowCount++;
+		}
+		refFile.close();
+		tstFile.close();
+	}
+	else
+	{
+		cout << "Impossibile aprire i file: " << reference << " e/o " << test << endl;
+		result = -1;
+	}
+	if (result == 0)
+		cout << "File identici" << endl;
+	return result;
+}
 
 int main(int argc, char const *argv[])
 {
@@ -581,12 +673,12 @@ int main(int argc, char const *argv[])
 	{
 		for (int j = 0; j < n+d; j++)
 		{
-			u[i][j] = 20;
+			u[i][j] = 300;
 		}
-	}
+	}*/
 
 	//IST 1
-	for (int k = 0; k < K; k++)
+	/*for (int k = 0; k < K; k++)
 	{
 		c[0][5][k] = 2;
 		c[5][0][k] = 2;
@@ -635,7 +727,62 @@ int main(int argc, char const *argv[])
 	t[3][1] = 0;
 	t[3][2] = 0;*/
 
-	loadInstance("test.txt");
+	//IST2
+	/*for (int k = 0; k < K; k++)
+	{
+		c[0][6][k] = 2;
+		c[6][0][k] = 2;
+
+		c[5][6][k] = 2;
+		c[6][5][k] = 2;
+
+		c[7][6][k] = 2;
+		c[6][7][k] = 2;
+
+		c[5][4][k] = 2;
+		c[4][5][k] = 2;
+
+		c[2][7][k] = 2;
+		c[7][2][k] = 2;
+
+
+		c[3][7][k] = 2;
+		c[7][3][k] = 2;
+
+		c[1][6][k] = 2;
+		c[6][1][k] = 2;
+
+	}
+
+	t[0][1] = 2;
+	t[0][2] = 3;
+	t[0][3] = 4;
+	t[0][4] = 5;
+
+	t[1][0] = 0;
+	t[1][2] = 1;
+	t[1][3] = 6;
+	t[1][4] = 10;
+
+	t[2][0] = 13;
+	t[2][1] = 7;
+	t[2][3] = 15;
+	t[2][4] = 12;
+
+	t[3][0] = 14;
+	t[3][1] = 11;
+	t[3][2] = 18;
+	t[3][4] = 17;
+
+	t[4][0] = 8;
+	t[4][1] = 19;
+	t[4][2] = 16;
+	t[4][3] = 9;*/
+
+	
+
+
+	loadInstance("test2.txt");
 	convertIntoBMatrix();
 	buildAdjMatrix(threshold);
 	
@@ -660,7 +807,7 @@ int main(int argc, char const *argv[])
 			}
 		}
 	}
-
+	saveInstance("test2.txt");
 	//saveInstance("test.txt");
 	try
 	{
@@ -674,42 +821,63 @@ int main(int argc, char const *argv[])
 		// optimize
 		CHECKED_CPX_CALL(CPXmipopt, env, lp);
 
-		// print objval
-		CHECKED_CPX_CALL(CPXgetobjval, env, lp, &objval);
-		cout << "Objval: " << objval << std::endl;
-
-		//print solution (var values)
-		int n = CPXgetnumcols(env, lp);
-
-		vector<double> varVals;
-		varVals.resize(n);
-		char **cur_colname = new char *[1] ;
-		int cur_storespace=16;
-		char *cur_colnamestore = new char[cur_storespace];
-		int *surplus = new int[1];
-
-
-
-		CHECKED_CPX_CALL(CPXgetx, env, lp, &varVals[0], 0, n - 1);
-		/// status = CPXgetx (env, lp, x, 0, CPXgetnumcols(env, lp)-1);
-		for (int i = 0; i < n; i++)
+		//print unit test file
+		ofstream unitFile;
+		unitFile.open("solution2.txt", ios::out);
+		if (unitFile.is_open())
 		{
-			if (varVals[i] != 0)
-			{
-				//
-				/// to get variable name, use the RATHER TRICKY "CPXgetcolname"
-				status = CPXgetcolname (env, lp, cur_colname, cur_colnamestore, cur_storespace, surplus, i, i);
-				if(status ==0)
-					cout << cur_colnamestore << " : " << varVals[i] << std::endl;
-				else
-					cout << "Var in position " << i << " : " << varVals[i] << std::endl;
-			}
-		}
 
-		delete[] surplus;
-		delete[] cur_colnamestore;
-		delete[] cur_colname;
-		CHECKED_CPX_CALL(CPXsolwrite, env, lp, "flow.sol");
+			// print objval
+			CHECKED_CPX_CALL(CPXgetobjval, env, lp, &objval);
+			cout << "Objval: " << objval << endl;
+			unitFile << "Objval: " << objval << endl;
+
+			//print solution (var values)
+			int n = CPXgetnumcols(env, lp);
+
+			vector<double> varVals;
+			varVals.resize(n);
+			char **cur_colname = new char *[1];
+			int cur_storespace = 16;
+			char *cur_colnamestore = new char[cur_storespace];
+			int *surplus = new int[1];
+
+
+
+			CHECKED_CPX_CALL(CPXgetx, env, lp, &varVals[0], 0, n - 1);
+			/// status = CPXgetx (env, lp, x, 0, CPXgetnumcols(env, lp)-1);
+			for (int i = 0; i < n; i++)
+			{
+				if (varVals[i] != 0)
+				{
+					//
+					/// to get variable name, use the RATHER TRICKY "CPXgetcolname"
+					status = CPXgetcolname(env, lp, cur_colname, cur_colnamestore, cur_storespace, surplus, i, i);
+					if (status == 0)
+					{
+						cout << cur_colnamestore << " : " << varVals[i] << endl;
+						unitFile << cur_colnamestore << " : " << varVals[i] << endl;
+					}
+					else
+					{
+						cout << "Var in position " << i << " : " << varVals[i] << endl;
+						unitFile << "Var in position " << i << " : " << varVals[i] << endl;
+					}
+				}
+			}
+
+			delete[] surplus;
+			delete[] cur_colnamestore;
+			delete[] cur_colname;
+			testSolutionFile("refIST2.txt","solution2.txt");
+		}
+		unitFile.close();
+
+
+		//vector<double> y(P, 0);
+		//status = CPXgetx(env, lp, y, y_index, y_index+P);
+
+		CHECKED_CPX_CALL(CPXsolwrite, env, lp, "flow2.sol");
 		// free
 		CPXfreeprob(env, &lp);
 		CPXcloseCPLEX(&env);
