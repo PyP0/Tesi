@@ -33,6 +33,8 @@ int droneRXCapacity = 10000;
 
 int nodeRadius = 3;
 
+int epsilonNodeRadius = 1;
+
 //parametri griglia
 int length = 0;
 int height = 0;
@@ -92,6 +94,11 @@ int getGridStep()
 int getNodeRadius()
 {
 	return nodeRadius;
+}
+
+int getEpsilonNodeRadius()
+{
+	return epsilonNodeRadius;
 }
 
 int getTXCapacity()
@@ -178,91 +185,77 @@ static int placeUsersSere()
 			grid[i].id = -1;
 		}
 
-		cout<< "start"<<endl;
-
 		for (int i = 0; i < n; i++)
 		{
 			//int chosenIndex = getRand(0, (int)mapPool.size()-1);
 			//int chosenValue = mapPool.at(chosenIndex);
 
-
 			int chosenIndex = 0;
-			do //TODO: renderla deterministica
+
+			if (mapPool.size() == 0)
 			{
-				chosenIndex = getRand(0, mapPool.bucket_count() - 1);
-			} 
-			while (mapPool.bucket_size(chosenIndex) == 0);
-
-			//alternativa, deterministica ma piu' lenta
-			//else: auto random_it = std::next(std::begin(edges), rand_between(0, edges.size()));
-			//auto element = next(begin(mapPool),getRand(0,mapPool.size()) );
-
-			//printBuckets(mapPool);
-			//getRand(0, mapPool.bucket_count() - 1);
-
-			//chosenValue = std::advance(mapPool.begin(chosenIndex), 1);
-			auto element = mapPool.begin(chosenIndex);
-			//advance(element, 0); non causa modifiche
-			int chosenValue = element->second;
-
-			
-			//randomize by bucket 
-
-			grid[chosenValue].isUser = true;
-			grid[chosenValue].id = i;
-
-			cout << chosenValue << " " << grid[chosenValue].id << " " << grid[chosenValue].x << " " << grid[chosenValue].y << endl;
-			
-			//cout << "Ho scelto il nodo: " << chosenIndex << " " << chosenValue << " " << grid[chosenValue].x << " " << grid[chosenValue].y << endl;
-			if (nodeRadius >= step)
+				cerr << __FUNCTION__ << "(): Impossibile posizionare gli utenti." << endl;
+				return 1;
+			}
+			else
 			{
-				int startX = max(0, roundUp(grid[chosenValue].x - nodeRadius, step)), startY = max(0, roundUp(grid[chosenValue].y - nodeRadius, step));
-
-				int endX = min(roundDown(grid[chosenValue].x + nodeRadius, step), length - 1), endY = min(roundDown(grid[chosenValue].y + nodeRadius, step), height - 1);
-
-				//cout << "start(" << startX << " " << startY << ")" << endl;
-				//cout << "end(" << endX << " " << endY << ")" << endl;
-				for (int y = startY; y <= endY; y = y + step)
+				do //TODO: renderla deterministica
 				{
-					for (int x = startX; x <= endX; x = x + step)
+					chosenIndex = getRand(0, mapPool.bucket_count() - 1);
+				} 
+				while (mapPool.bucket_size(chosenIndex) == 0);
+
+				//alternativa, deterministica ma piu' lenta
+				//else: auto random_it = std::next(std::begin(edges), rand_between(0, edges.size()));
+				//auto element = next(begin(mapPool),getRand(0,mapPool.size()) );
+
+				//printBuckets(mapPool);
+				//getRand(0, mapPool.bucket_count() - 1);
+
+				//chosenValue = std::advance(mapPool.begin(chosenIndex), 1);
+				auto element = mapPool.begin(chosenIndex);
+				//advance(element, 0); non causa modifiche
+				int chosenValue = element->second;
+
+			
+				//randomize by bucket 
+
+				grid[chosenValue].isUser = true;
+				grid[chosenValue].id = i;
+
+				cout << chosenValue << " " << grid[chosenValue].id << " " << grid[chosenValue].x << " " << grid[chosenValue].y << endl;
+				
+				//cout << "Ho scelto il nodo: " << chosenIndex << " " << chosenValue << " " << grid[chosenValue].x << " " << grid[chosenValue].y << endl;
+				if (nodeRadius >= step)
+				{
+					int startX = max(0, roundUp(grid[chosenValue].x - nodeRadius, step));
+					int startY = max(0, roundUp(grid[chosenValue].y - nodeRadius, step));
+
+					int endX = min(roundDown(grid[chosenValue].x + nodeRadius, step), (length - 1) * step);
+					int endY = min(roundDown(grid[chosenValue].y + nodeRadius, step), (height - 1) * step);
+
+					//cout << "start(" << startX << " " << startY << ")" << endl;
+					//cout << "end(" << endX << " " << endY << ")" << endl;
+					for (int y = startY; y <= endY; y = y + step)
 					{
-						//eliminazione dei nodi
-						double dst = getDistance(x, y, grid[chosenValue].x, grid[chosenValue].y);
-						//cout << "dist: " << "(" << x << "," << y << ") " << "(" << grid[chosenValue].x << "," << grid[chosenValue].y << ")" << " : " << dst << endl;
-						if (dst <= nodeRadius)
+						for (int x = startX; x <= endX; x = x + step)
 						{
-							if (mapPool.size() == 0)
+							//eliminazione dei nodi
+							double dst = getDistance(x, y, grid[chosenValue].x, grid[chosenValue].y);
+							//cout << "dist: " << "(" << x << "," << y << ") " << "(" << grid[chosenValue].x << "," << grid[chosenValue].y << ")" << " : " << dst << endl;
+							if (dst <= nodeRadius)
 							{
-								cerr << __FUNCTION__ << "(): Impossibile posizionare gli utenti." << endl;
-								return 1;
-							}
-							else
-							{
+								
 								int nodeId = (y / step) * length + (x / step);
 
-								//int counter=0, flag=0; unsigned int i=0;
-								/*while(i<mapPool.size() && flag==0)
-								{
-								if(mapPool[i][1] == nodeId)
-								flag=1;
-								else
-								counter++;
-								i++;
-								}*/
+									
 								//cout << "sto per cancellare id: " << mapPool[nodeId][1] <<endl;
 								//cout << "sto per cancellare id: " << counter <<endl;
 								//mapPool.erase(mapPool.begin() + nodeId); 
 								//cout << "Sto per cancellare il nodo " << nodeId << endl;
 								mapPool.erase(nodeId);
 
-								if (mapPool.size() == 0)
-								{
-									cerr << __FUNCTION__ << "(): Impossibile posizionare gli utenti." << endl;
-									return 1;
-								}
-
 								//cout << "nodeId " << nodeId << " size: " << mapPool.size() << endl;
-
 								//int check = 0;
 								/*for (auto& x : mapPool)
 								{
@@ -272,39 +265,38 @@ static int placeUsersSere()
 								}*/
 								/*cout << endl;
 								if (check == 0)
-									cout << "Il nodo: " << nodeId << " e' stato eliminato." << endl;*/
+									cout << "Il nodo: " << nodeId << " e' stato eliminato." << endl;*/							
 							}
 						}
 					}
+					//cout << " cancello il nodo " << chosenIndex << endl;
+					mapPool.erase(chosenIndex);
 				}
-				//cout << " cancello il nodo " << chosenIndex << endl;
-				mapPool.erase(chosenIndex);
 			}
-		}
 
-		//assegnazione id ai nodi P
-		int progressiveId = n;  
-		for(unsigned int i=0; i < grid.size(); i++)
-		{
-			if(grid[i].isUser == false)
+			//assegnazione id ai nodi P
+			int progressiveId = n;  
+			for(unsigned int i=0; i < grid.size(); i++)
 			{
-				grid[i].id = progressiveId;
-				progressiveId++;
+				if(grid[i].isUser == false)
+				{
+					grid[i].id = progressiveId;
+					progressiveId++;
+				}
+			}
+
+			
+			//filling the map
+			for(unsigned int i=0; i < grid.size(); i++)
+			{
+				int gridIndex = grid[i].id;
+
+				mapGrid[gridIndex].id = i;
+				mapGrid[gridIndex].isUser = grid[i].isUser; 
+				mapGrid[gridIndex].x = grid[i].x; 
+				mapGrid[gridIndex].y = grid[i].y; 
 			}
 		}
-
-		
-		//filling the map
-		for(unsigned int i=0; i < grid.size(); i++)
-		{
-			int gridIndex = grid[i].id;
-
-			mapGrid[gridIndex].id = i;
-			mapGrid[gridIndex].isUser = grid[i].isUser; 
-			mapGrid[gridIndex].x = grid[i].x; 
-			mapGrid[gridIndex].y = grid[i].y; 
-		}
-
 		/*for(unsigned int i=0; i< mapGrid.size();i++)
 		{
 			cout<< i <<")"<<endl;
@@ -313,7 +305,6 @@ static int placeUsersSere()
 			cout<< mapGrid[i].x <<endl;
 			cout<< mapGrid[i].y <<endl;
 		}*/
-
 		return 0;
 	}
 	else
@@ -331,7 +322,6 @@ static int createGrid()
 		int xCoord = 0, yCoord = 0;
 		int rows = 0;
 		int index = 0;
-		int status = 0;
 		try
 		{
 			grid.resize(length*height);
@@ -377,7 +367,7 @@ static int initDataStructures(int n, int d, int P)
 	if (n > 0 && d > 0 && P > 0)
 	{
 		totalNodes = n + d;
-		totalPotentialNodes = n + P;
+		totalPotentialNodes =  n + P;
 		K = n*(n - 1);
 
 		try
@@ -664,10 +654,9 @@ int saveInstance(const char *filename)
 				}
 			}
 
-
-			file << mapGrid.size() << endl;
-			for(unsigned int i = 0; i< mapGrid.size(); i++)
+			for(int i = 0; i< totalPotentialNodes; i++)
 			{
+				file << i << " ";
 				file << mapGrid[i].id << " ";
 				file << mapGrid[i].isUser << " ";
 				file << mapGrid[i].x << " ";
@@ -698,6 +687,8 @@ int loadInstance(const char *filename) //TODO: controlli su possibile istanza co
 	ifstream file;
 
 	n = 0, d = 0, P = 0;
+	totalNodes = 0;
+	totalPotentialNodes = 0;
 
 	file.open(filename, ios::in);
 	if (file.is_open())
@@ -705,6 +696,10 @@ int loadInstance(const char *filename) //TODO: controlli su possibile istanza co
 		try
 		{
 			file >> n >> d >> P;
+
+			totalNodes = n + d;
+			totalPotentialNodes =  n + P;
+
 			file >> s >> threshold >> droneTXCapacity;
 			file >> droneRXCapacity >> nodeRadius;
 			file >> length >> height >> step;
@@ -746,17 +741,45 @@ int loadInstance(const char *filename) //TODO: controlli su possibile istanza co
 						}
 					}
 
-					int mapSize = 0;
-					file >> mapSize;
-					for(int i = 0; i< mapSize; i++)
+	
+					for(int i = 0; i< totalPotentialNodes; i++)
 					{
-						file >> mapGrid[i].id;
-						file >> mapGrid[i].isUser;
-						file >> mapGrid[i].x;
-						file >> mapGrid[i].y;
+						int index = -1;
+						file >> index;
+						file >> mapGrid[index].id;
+						file >> mapGrid[index].isUser;
+						file >> mapGrid[index].x;
+						file >> mapGrid[index].y;
 					}
 
+					 std::map<int,nodesCoordinates_t>::iterator it = mapGrid.begin();
+					for (it=mapGrid.begin(); it!=mapGrid.end(); ++it)
+    				{	
+    					cout << it->first << ")" << endl;
+    					cout << it->second.id << '\n';
+    					cout << it->second.isUser << '\n';
+    					cout << it->second.x << ' ';
+    					cout << it->second.y << '\n';
+    				}
 					convertIntoBMatrix();
+
+					//debug
+					for(int i=0; i< totalPotentialNodes;i++)
+					{
+						cout << mapGrid[i].id << " can reach: ";
+						for(int j=0; j< totalPotentialNodes; j++)
+						{
+							
+							if(i!=j)
+							{
+								
+								if(isInRange(mapGrid[i].x,mapGrid[i].y,mapGrid[j].x, mapGrid[j].y, nodeRadius))
+									cout << mapGrid[j].id << " ";
+
+							}
+						}
+						cout << endl;
+					}
 				}
 				else
 				{
@@ -884,11 +907,11 @@ void printNodesIOFlow()
 	if (t.size() > 0)
 	{
 		int accIN = 0, accOUT = 0;
-		for (int i = 0; i < getUsrsNum(); i++)
+		for (int i = 0; i < n; i++)
 		{
 			accIN = 0, accOUT = 0;
 			cout << i << ")";
-			for (int j = 0; j < getUsrsNum(); j++)
+			for (int j = 0; j < n; j++)
 			{
 				if (i != j)
 				{

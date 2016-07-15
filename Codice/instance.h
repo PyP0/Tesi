@@ -4,6 +4,7 @@
 #include "cpxmacro.h"
 #include <vector>
 #include <unordered_map>
+#include <map>
 
 #define DISCONNECTED_COST CPX_INFBOUND
 #define INSTANCE_PATH "../instances/"
@@ -32,6 +33,8 @@ extern std::vector< std::vector<double> > u;
 //matrice bilanciamento flussi
 extern std::vector< std::vector<double> > b;
 
+extern std::map<int, nodesCoordinates_t> mapGrid;
+
 int getUsrsNum();
 int getDrnsNum();
 int getPosNum();
@@ -40,6 +43,7 @@ int getGridL();
 int getGridH();
 int getGridStep();
 int getNodeRadius();
+int getEpsilonNodeRadius();
 int getTXCapacity();
 int getRXCapacity();
 int getThreshold();

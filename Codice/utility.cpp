@@ -57,7 +57,7 @@ double getDistance(int px, int py, int qx, int qy)
 
 bool isInRange(int px, int py, int centerx, int centery, int radius)
 {
-	if (abs(getDistance(px, py, centerx, centery)) <= radius)
+	if (getDistance(px, py, centerx, centery) <= (double)radius)
 		return true;
 	else
 		return false;

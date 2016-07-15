@@ -20,9 +20,10 @@ void printHelper() //TODO
 
 vector< string > loadFileList(string masterFile)
 {
-	vector< string > fileList;
+	vector< string> fileList;
 	string fileLine;
 	ifstream file;
+	int count = 0;
 	file.open(masterFile,ios::in);
 	if(file.is_open())
 	{
@@ -31,8 +32,10 @@ vector< string > loadFileList(string masterFile)
 			file >> fileLine;
 			cout <<fileLine <<endl;
 			fileList.push_back(fileLine);
+			if(!file.eof())
+				count++;
 		}
-		cout << "Sono state caricate " << fileList.size() << " istanze." << endl;
+		cout << "Sono state caricate " << count << " istanze." << endl;
 		file.close();
 		return fileList;
 	}
@@ -186,8 +189,8 @@ int main(int argc, char const *argv[])
 		return 0;
 	}
 	if(argc == 1)
-		             //instQuantity,         users,           drones,        positions,       gridLength,      gridHeight,        gridStep,tInf,tSup,cInf,cSup,dInf,dSup,instRootName)
-		createBatchInstances(10, vector<int>(1,10),vector<int>(1,20),vector<int>(1,50),vector<int>(1,10),vector<int>(1,5),vector<int>(1,2),0,30,5,10,20,50,string("automatictest"));
+		//int instQuantity, vector<int> users, vector<int> drones, vector<int> positions, vector<int> gridLength, vector<int> gridHeight, vector<int> gridStep, int tInf, int tSup, double cInf, double cSup, double dInf, double dSup, string instRootName)
+		createBatchInstances(1, vector<int>(1,5),vector<int>(1,20),vector<int>(1,24),vector<int>(1,6),vector<int>(1,4),vector<int>(1,2),0,30,5,10,20,50,string("automatictest"));
 	else
 	{
 		/*solution_t *instSolution=NULL;
