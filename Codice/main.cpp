@@ -1,5 +1,5 @@
 /**
-* @file modelv0.8.cpp
+* @file modelv0.9.1.cpp
 * @brief
 */
 
@@ -19,7 +19,7 @@ using namespace std::chrono;
 
 struct solution_t
 {
-	vector<double> yPositions;
+	double *yPositions;
 	double objValue;
 };
 
@@ -29,6 +29,17 @@ struct nodesCoordinates_t
 	int x;
 	int y;
 	int id;
+};
+
+struct instance_t
+{
+	int n;
+	int d;
+	int P;
+	int totalNodes;
+	int totalPotentialNodes;
+	int K;
+	int s;
 };
 
 // error status and message buffer
@@ -60,13 +71,15 @@ const int bigM = 1000; // TODO: bigM deve essere maggiore della capacità massim
 
 const int threshold = 100; //soglia oltre la quale un costo viene considerato infinito
 
-
+int droneTXCapacity= 20000;
+int droneRXCapacity= 10000;
 
 //indici iniziali per la memorizzazione delle variabili di CPLEX
 int f_index = 0;
 int y_index = 0;
 int x_index = 0;
 int w_index = 0;
+int z_index = 0;
 
 //int t[n][n];
 //matrice di traffico
@@ -94,30 +107,153 @@ const double zero = 0.0;
 const double uno = 1.0;
 
 
-vector<nodesCoordinates_t> createNodesStruct(int size)
+//vector<nodesCoordinates_t> *createNodesStruct(int);
+bool areOutOfSight(int,int);
+
+double getdRand(double,double);
+int getRand(int,int);
+void randomizeTraffic(int,int);
+void randomizeCosts(double,double,double, double);
+void randomizeDeployCost(double, double);
+void createRandomInstance(int,int,int,int,int,double,double,double,double,double,double,const char *);
+void setCompleteGraph(double, int);
+void applyDiscount(double);
+void setCostsByRadius(int, int, int, int, int, float);
+double getDistanceCoef(int, int);
+bool isIntersection(double,double,double,double,double,double);
+double getInterferenceFactor(int, int);
+
+
+void setupLP(CEnv, Prob);
+
+int saveInstance(const char *);
+int initDataStructures(int, int, int);
+int loadInstance(const char *);
+void convertIntoBMatrix();
+
+
+int testSolutionFile(const char *,const char *);
+solution_t *saveSolution(CEnv, Prob, int);
+void printSolution(solution_t);
+void printVarsValue(CEnv, Prob);
+void printSimplifiedSolFile(CEnv,Prob, const char*);
+int getSolutionFlowMatrix(CEnv, Prob, vector< vector< vector<int> > > &);
+
+void printNetworkUsage(vector< vector< vector<int> > > &);
+void printNodesIOFlow();
+
+
+vector< nodesCoordinates_t > createGrid(double,double,double);
+
+//-----------------------------------------------------------------------------
+
+/*vector<nodesCoordinates_t> *createNodesStruct(int size)
 {
 	vector<nodesCoordinates_t> *nodi = new vector<nodesCoordinates_t>(size);
 	return nodi;
+}*/
+
+//alloca e popola un vettore per ospitare le coordinate di tutti i punti 
+vector< nodesCoordinates_t > createGrid(double length, double height, double step)
+{
+	if(length >0 && height > 0 && step >0)
+	{
+		double xCoord=0.0, yCoord=0.0;
+
+		vector< nodesCoordinates_t > grid(length*height); 
+		int rows=0;
+		int index=0;
+		for(int a=0; a<height; a++)
+		{
+			xCoord=0.0;
+			
+			for(int b=0; b< length; b++)
+			{
+				grid[index].x = xCoord;
+				xCoord+=step;
+
+				grid[index].y = yCoord;
+				index++;
+			}
+			rows++;
+			yCoord+=step;
+		}
+		return grid;
+	}
+	else
+	{
+		cerr << __FUNCTION__ << "(): Uno o piu' parametri sono errati.";
+		//return empty vector
+		return vector< nodesCoordinates_t >();
+	}
 }
 
-void setNodesCoordinates(vector<nodesCoordinates_t> &nodes, int RowSize)
+void printGrid(vector< nodesCoordinates_t > grid)
 {
-	int rows=0;
-	for(int i= 0; i<nodes.size();i++ )
+	if(grid.size() > 0)
 	{
-		if(i%8 < )
+		for(unsigned int i=0; i<grid.size();i++)
+		{
+			cout << i << ": " << "(" << grid[i].x << ", " << grid[i].y << ")" << endl; 
+		}
 	}
+	else
+	{
+		cerr << __FUNCTION__ << "(): Struttura dati vuota.";
+	}
+}
+
+
+double getDistanceCoef(int i, int j)
+{
+	return 1.0; //TODO
+}
+
+double getInterferenceFactor(int i, int j)
+{
+	return 1.0; //TODO
+}
+
+double getDistance(int px, int py, int qx, int qy)
+{
+	return sqrt(pow(sqrt(px - qx), 2) + pow(sqrt(px - qx), 2));
+}
+
+bool isInRange(int px, int py, int centerx, int centery, int radius)
+{
+	if (abs(getDistance(px, py, centerx, centery)) <= radius)
+		return true;
+	else
+		return false;
+}
+
+bool isIntersection(double x0, double y0, double r0, double x1, double y1, double r1)
+{
+	//(R0-R1)^2 <= (x0-x1)^2+(y0-y1)^2 <= (R0+R1)^2
+	double diffCoords = pow(x0-x1,2) + pow(y0-y1,2);
+	if (diffCoords >= pow(r0-r1,2) || diffCoords <= pow(r0+r1,2))
+		return true;
+	else
+		return false;
 }
 
 bool areOutOfSight(int i, int j)
 {
 	int k = 0;
 	bool flag = true;
-	while (k < K && flag == true)
+	if (c.size() > 0) //c e' gia' stato allocato?
 	{
-		if (c[i][j][k] <= threshold)
-			flag = false;
-		k++;
+		while (k < K && flag == true)
+		{
+			if (c[i][j][k] <= threshold)
+				flag = false;
+			k++;
+		}
+	}
+	else
+	{
+		flag = false;
+		cerr << __FUNCTION__ << "(): Struttura dati non allocata." << endl;
 	}
 	return flag;
 }
@@ -150,51 +286,72 @@ int getRand(int inf, int sup)
 
 void randomizeTraffic(int minVal, int maxVal)
 {
-	for (unsigned int i = 0; i < t.size(); i++)
+	if (t.size() > 0)
 	{
-		for (unsigned int j = 0; j < t[0].size(); j++)
+		for (unsigned int i = 0; i < t.size(); i++)
 		{
-			if (i != j)
-				t[i][j] = getRand(minVal, maxVal);
+			for (unsigned int j = 0; j < t[0].size(); j++)
+			{
+				if (i != j)
+					t[i][j] = getRand(minVal, maxVal);
+			}
 		}
+	}
+	else
+	{
+		cerr << __FUNCTION__ << "(): Struttura dati non allocata." << endl;
 	}
 }
 
 void randomizeCosts(double minCVal, double maxCVal, double minUVal, double maxUVal)
 {
-	for(unsigned int i=0; i < c.size(); i++)
+	if (c.size() > 0 && u.size() > 0)
 	{
-		for(unsigned int j=0; j< c[0].size(); j++)
+		for (unsigned int i = 0; i < c.size(); i++)
 		{
-			for(unsigned int k=0; k< c[0][0].size(); k++)
+			for (unsigned int j = 0; j < c[0].size(); j++)
 			{
-				if(i!=j)
+				for (unsigned int k = 0; k< c[0][0].size(); k++)
 				{
-					c[i][j][k] = getdRand(minCVal,maxCVal);
-					if(c[i][j][k] > threshold)
+					if (i != j)
 					{
-						u[i][j]=0;
-					}
-					else
-					{
-						u[i][j] = getdRand(minUVal,maxUVal);
+						c[i][j][k] = getdRand(minCVal, maxCVal);
+						if (c[i][j][k] > threshold)
+						{
+							u[i][j] = 0;
+						}
+						else
+						{
+							u[i][j] = getdRand(minUVal, maxUVal);
+						}
 					}
 				}
 			}
 		}
 	}
+	else
+	{
+		cerr << __FUNCTION__ << "(): Strutture dati non allocate." << endl;
+	}
 }
 
 void randomizeDeployCost(double minVal, double maxVal)
 {
-	for(unsigned int i=0; i<deployCost.size();i++)
+	if (deployCost.size() > 0)
 	{
-		deployCost[i]=getdRand(minVal,maxVal);
+		for (unsigned int i = 0; i < deployCost.size(); i++)
+		{
+			deployCost[i] = getdRand(minVal, maxVal);
+		}
 	}
+	else
+	{
+		cerr << __FUNCTION__ << "(): Strutture dati non allocate." << endl;
+	}
+
 }
 
-
-void createRandomInstance(int users, int drones, int positions)
+void createRandomInstance(int users, int drones, int positions, int tInf, int tSup, double cInf, double cSup, double uInf, double uSup, double dInf, double dSup, const char *filename)
 {
 	int result=0;
 	n=users;
@@ -204,11 +361,13 @@ void createRandomInstance(int users, int drones, int positions)
 	if(result==0)
 	{
 		randomizeTraffic(tInf,tSup);
-		randomizeCosts(cInf,cSup);
+		randomizeCosts(cInf,cSup,uInf,uSup);
+		randomizeDeployCost(dInf,dSup);
+		saveInstance(filename); 
 	}
 	else
 	{
-
+		cerr << __FUNCTION__ << "(): Impossibile creare la nuova istanza." << endl;
 	}
 }
 
@@ -230,13 +389,638 @@ void applyDiscount(double alpha)
 	}
 }
 
+int saveInstance(const char *filename)
+{
+	int status = 0;
+	if (n > 0 && d > 0 && P>0)
+	{
+		ofstream file;
+		file.open(filename, ios::out);
+		if (file.is_open())
+		{
+			file << n << endl;
+			file << d << endl;
+			file << P << endl;
+			for (unsigned int i = 0; i < deployCost.size(); i++)
+			{
+				file << deployCost[i] << " ";
+			}
+			file << endl;
+
+			for (unsigned int i = 0; i < t.size(); i++)
+			{
+				for (unsigned int j = 0; j < t[0].size(); j++)
+				{
+					file << t[i][j] << " ";
+				}
+				file << endl;
+			}
+
+			for (unsigned int i = 0; i < u.size(); i++)
+			{
+				for (unsigned int j = 0; j < u[0].size(); j++)
+				{
+					file << u[i][j] << " ";
+				}
+				file << endl;
+			}
+
+			for (unsigned int i = 0; i < c.size(); i++)
+			{
+				for (unsigned int j = 0; j < c[0].size(); j++)
+				{
+					for (unsigned int k = 0; k < c[0][0].size(); k++)
+					{
+						file << c[i][j][k] << " ";
+					}
+					file << endl;
+				}
+			}
+
+			file.close();
+		}
+		else
+		{
+			cerr << __FUNCTION__ << "(): Impossibile aprire il file: " << filename << endl;
+			status = 1;
+		}
+	}
+	else
+	{
+		cerr << __FUNCTION__ << "(): Impossibile salvare l'istanza vuota. " << endl;
+		status = 1;
+	}
+	return status;
+
+}
+
+int initDataStructures(int n, int d, int P)
+{
+	int success = 0;
+	if (n > 0 && d > 0 && P > 0)
+	{
+		totalNodes = n + d;
+		totalPotentialNodes = n + P;
+		K = n*(n - 1);
+
+		try
+		{
+			//matrice nxn, init=-1
+			t.resize(n);
+			for (int i = 0; i < n; i++)
+			{
+				t[i].resize(n, -1);
+			}
+
+			//vettore P, init=-1
+			deployCost.resize(P, -1);
+
+			//matrice 3D (n+P)x(n+P)x(K), init=DISCONNECTED_COST
+			c.resize(totalPotentialNodes);
+			for (int i = 0; i < totalPotentialNodes; i++)
+			{
+				c[i].resize(totalPotentialNodes);
+				for (int j = 0; j < totalPotentialNodes; j++)
+				{
+					c[i][j].resize(K, DISCONNECTED_COST);
+				}
+			}
+
+			//matrice (n+P)x(n+P), init=-1
+			u.resize(totalPotentialNodes);
+			for (int i = 0; i < totalPotentialNodes; i++)
+			{
+				u[i].resize(totalPotentialNodes, -1);
+			}
+
+			//matrice (n+P)x(K), init=0
+			b.resize(totalPotentialNodes);
+			for (int i = 0; i < totalPotentialNodes; i++)
+			{
+				b[i].resize(K, 0);
+			}
+		}
+		catch (exception& e)
+		{
+			cerr << __FUNCTION__ << "(): An exception occurred: " << e.what() << endl;
+			success = 1;
+		}
+	}
+	else
+	{
+		cerr << __FUNCTION__ << "(): Impossibile allocare strutture con dimensione 0." << endl;
+		success = 1;
+	}
+	return success;
+}
+
+int loadInstance(const char *filename) //TODO: controlli su possibile istanza corrotta (getline)
+{
+	int result = 0;
+	ifstream file;
+
+	n = 0, d = 0, P = 0;
+
+	file.open(filename, ios::in);
+	if (file.is_open())
+	{
+		try
+		{
+			file >> n >> d >> P;
+			if (n > 0 && d > 0 && P > 0)
+			{
+				if (initDataStructures(n, d, P) == 0)
+				{
+					for (unsigned int i = 0; i < deployCost.size(); i++)
+					{
+						file >> deployCost[i];
+					}
+
+					for (unsigned int i = 0; i < t.size(); i++)
+					{
+						for (unsigned int j = 0; j < t[0].size(); j++)
+						{
+							file >> t[i][j];
+						}
+					}
+
+					for (unsigned int i = 0; i < u.size(); i++)
+					{
+						for (unsigned int j = 0; j < u[0].size(); j++)
+						{
+							file >> u[i][j];
+						}
+					}
+
+					for (unsigned int i = 0; i < c.size(); i++)
+					{
+						for (unsigned int j = 0; j < c[0].size(); j++)
+						{
+							for (unsigned int k = 0; k < c[0][0].size(); k++)
+							{
+								file >> c[i][j][k];
+							}
+						}
+					}
+				}
+				else
+				{
+					cerr << __FUNCTION__ << "(): Allocazione strutture fallita." << endl;
+					result = 1;
+				}
+			}
+			else
+			{
+				cerr << __FUNCTION__ << "(): Parametri dell'istanza " << filename << " errati." << endl;
+				result = 1;
+			}
+		}
+		catch (exception &e)
+		{
+			cerr << __FUNCTION__ << "(): An exception has occurred: " << filename << ": " << e.what() << endl;
+			result = 1;
+		}
+		file.close();
+	}
+	else
+	{
+		cerr << __FUNCTION__ << "(): Impossibile aprire il file " << filename << endl;
+		result = 1;
+	}
+	return result;
+}
+
+//costruisce la matrice b partendo dalla matrice di traffico 
+//la matrice b e' pre-inizializzata al valore 0
+void convertIntoBMatrix()
+{
+	if (t.size() > 0 && b.size() > 0)
+	{
+		int k = 0; //commodity counter
+		for (unsigned int i = 0; i < t.size(); i++)
+		{
+			for (unsigned int j = 0; j < t.size(); j++)
+			{
+				if (i != j)
+				{
+					//copia i valori dalla matrice t alla b. I valori vengono resi negativi perche' il traffico e'"uscente" dai nodi
+					b[i][k] = t[i][j] * (-1);
+
+					//il traffico uscente dal nodo i al nodo j sara' visto come traffico entrante dal nodo j
+					b[j][k] = t[i][j];
+					k++;
+				}
+			}
+		}
+	}
+	else
+	{
+		cerr << __FUNCTION__ << "(): Strutture dati non allocate." << endl;
+	}
+}
+
+
+//test sui file delle soluzioni
+int testSolutionFile(const char *reference, const char *test)
+{
+	ifstream refFile, tstFile;
+	const int buf = 128;
+	int rowCount = 1, result = 0;
+	refFile.open(reference, ios::in);
+	tstFile.open(test, ios::in);
+	if (refFile.is_open() && tstFile.is_open())
+	{
+		cout << "Verifica file:" << endl;
+		char str1[buf], str2[buf];
+		while (!refFile.eof() && !tstFile.eof())
+		{
+			refFile.getline(str1, buf, '\n');
+			tstFile.getline(str2, buf, '\n');
+			if (strcmp(str1, str2) != 0)
+			{
+				cout << "diff in row " << rowCount << ": " << str1 << " " << str2 << endl;
+				result = 1;
+			}
+			rowCount++;
+		}
+		refFile.close();
+		tstFile.close();
+	}
+	else
+	{
+		cerr << __FUNCTION__ << "(): Impossibile aprire i file: " << reference << " e/o " << test << endl;
+		result = -1;
+	}
+	if (result == 0)
+		cout << "File identici" << endl;
+	return result;
+}
+
+solution_t *saveSolution(CEnv env, Prob lp, int yBegin)
+{
+	try
+	{
+		int status = 0;
+		double objval = 0;
+
+		solution_t *solution= new solution_t; 
+
+		double *solutionArray = new double[P];
+
+
+		CHECKED_CPX_CALL(CPXgetobjval, env, lp, &objval);
+	
+		solution->objValue = objval;
+	
+		status = CPXgetx(env, lp, solutionArray, yBegin, yBegin + P-1);
+		if (status == 0)
+		{
+			solution->yPositions = solutionArray;
+			return solution;
+		}
+		else
+		{
+			solution->yPositions = NULL;
+			return NULL;
+		}
+	}
+	catch(exception &e)
+	{
+		cout<< __FUNCTION__ << " An exception has occurred: " << e.what() << endl; 
+		return NULL;
+	}
+}
+
+void printSolution(solution_t *solution)
+{
+	if(solution==NULL)
+	{
+		cerr << __FUNCTION__ << "(): Soluzione non allocata."<<endl;
+	}
+	else
+	{
+		int count = 0;
+		cout << endl << "Soluzione istanza: " << endl;
+		cout << "Valore f. obiettivo: " << solution->objValue << endl;
+		for (int i = 0; i < P; i++)
+		{
+			if (solution->yPositions[i] == 1)
+				count++;
+		}
+		cout << "Droni impiegati/droni totali: " << count << "/" << d << endl;
+
+		for (unsigned int i = 0; i < P; i++)
+		{
+			cout << "y_" << i + n << ": " << (int)solution->yPositions[i] << endl;
+		}
+		cout << endl;
+	}
+
+}
+
+void printVarsValue(CEnv env, Prob lp)
+{
+	try
+	{
+		char **cur_colname = new char *[1];
+		int cur_storespace = 16;
+		char *cur_colnamestore = new char[cur_storespace];
+		int *surplus = new int[1];
+
+		vector<double> varVals;
+
+		//print solution (var values)
+		int n = CPXgetnumcols(env, lp);
+
+		varVals.resize(n);
+
+		cout << "Visualizzazione delle variabili: " << endl;
+		CHECKED_CPX_CALL(CPXgetx, env, lp, &varVals[0], 0, n - 1);
+		for (int i = 0; i < n; i++)
+		{
+			if (varVals[i] != 0)
+			{
+				status = CPXgetcolname(env, lp, cur_colname, cur_colnamestore, cur_storespace, surplus, i, i);
+				if (status == 0)
+					cout << cur_colnamestore << " : " << varVals[i] << endl;
+				else
+					cout << "Var in position " << i << " : " << varVals[i] << endl;
+			}
+		}
+
+		delete[] surplus;
+		delete[] cur_colnamestore;
+		delete[] cur_colname;
+	}
+	catch (exception &e)
+	{
+		cout << __FUNCTION__ << " An exception has occurred: " << e.what() << endl;
+	}
+}
+
+void printSimplifiedSolFile(CEnv env, Prob lp, const char* solution)
+{
+	try
+	{
+		char **cur_colname = new char *[1];
+		int cur_storespace = 16;
+		char *cur_colnamestore = new char[cur_storespace];
+		int *surplus = new int[1];
+		double objval = 0;
+		vector<double> varVals;
+
+		//print unit test file
+		ofstream unitFile;
+		unitFile.open(solution, ios::out);
+		if (unitFile.is_open())
+		{
+			cout << "File " << solution << " creato." << endl;
+
+			// print objval
+			CHECKED_CPX_CALL(CPXgetobjval, env, lp, &objval);
+			unitFile << "Objval: " << objval << endl;
+
+			//print solution (var values)
+			int n = CPXgetnumcols(env, lp);
+
+			varVals.resize(n);
+
+			CHECKED_CPX_CALL(CPXgetx, env, lp, &varVals[0], 0, n - 1);
+			/// status = CPXgetx (env, lp, x, 0, CPXgetnumcols(env, lp)-1);
+			for (int i = 0; i < n; i++)
+			{
+				if (varVals[i] != 0)
+				{
+					//
+					/// to get variable name, use the RATHER TRICKY "CPXgetcolname"
+					status = CPXgetcolname(env, lp, cur_colname, cur_colnamestore, cur_storespace, surplus, i, i);
+					if (status == 0)
+					{
+						unitFile << cur_colnamestore << " : " << varVals[i] << endl;
+					}
+					else
+					{
+						unitFile << "Var in position " << i << " : " << varVals[i] << endl;
+					}
+				}
+			}
+
+			delete[] surplus;
+			delete[] cur_colnamestore;
+			delete[] cur_colname;
+
+		}
+		unitFile.close();
+	}
+	catch (exception &e)
+	{
+		cerr << __FUNCTION__ << " An exception has occurred: " << e.what() << endl;
+	}
+}
+
+void setCompleteGraph(double stdCost, int stdCap)
+{
+	if (c.size() > 0 && u.size() > 0)
+	{
+		for (unsigned int i = n; i < c.size(); i++)
+		{
+			for (unsigned int j = n; j < c[0].size(); j++)
+			{
+				if (i != j)
+				{
+					for (unsigned int k = 0; k < c[0][0].size(); k++)
+					{
+						c[i][j][k] = stdCost;
+					}
+					u[i][j] = stdCap;
+				}
+			}
+		}
+	}
+	else
+	{
+		cerr << __FUNCTION__ << "(): Strutture dati non allocate." << endl;
+	}
+}
+
+int getSolutionFlowMatrix(CEnv env, Prob lp, vector< vector< vector<int> > > &flow)
+{
+	int status = 0;
+	try
+	{
+		char **cur_colname = new char *[1];
+		int cur_storespace = 16;
+		char *cur_colnamestore = new char[cur_storespace];
+		int *surplus = new int[1];
+		vector<double> varVals;
+		char *tokens;
+
+		int indexes[3];
+		
+		//print solution (var values)
+		int n = CPXgetnumcols(env, lp);
+
+		varVals.resize(n);
+
+		CHECKED_CPX_CALL(CPXgetx, env, lp, &varVals[0], 0, n - 1);
+		int v = 0;
+		while (v < n && status == 0)
+		{
+			/// to get variable name, use the RATHER TRICKY "CPXgetcolname"
+			status = CPXgetcolname(env, lp, cur_colname, cur_colnamestore, cur_storespace, surplus, v, v);
+			if (status == 0)
+			{
+				if (cur_colnamestore[0] != 'f')
+				{
+					status = 1;
+				}
+				else
+				{
+					int i = 0;
+					//cout<< "stringa: " << cur_colnamestore<<endl;
+					tokens = strtok(cur_colnamestore, "f_");
+					if (tokens != NULL)
+						indexes[i] = atoi(tokens);
+					//cout << "token trovato: " << tokens << endl;
+
+					while (tokens != NULL)
+					{
+						tokens = strtok(NULL, "f_");
+						if (tokens != NULL)
+						{
+							i++;
+							//cout << "token trovato: " << tokens << endl;
+							indexes[i] = atoi(tokens);
+
+						}
+					}
+					//cout<< "indici:\n"<< indexes[0] <<" "<< indexes[1] <<" "<< indexes[2]<<endl;
+
+
+					if (indexes[0] >= 0 && indexes[0] < totalPotentialNodes && indexes[1] >= 0 && indexes[1] < totalPotentialNodes && indexes[2] >= 0 && indexes[2] < K)
+					{
+						flow[indexes[0]][indexes[1]][indexes[2]] = varVals[v];
+					}
+					else
+					{
+						status = 1;
+					}
+				}
+			}
+
+			v++;
+		}
+		delete[] surplus;
+		delete[] cur_colnamestore;
+		delete[] cur_colname;
+		return status;
+	}
+	catch (exception &e)
+	{
+		cerr << __FUNCTION__ << " An exception has occurred: " << e.what() << endl;
+		status = 1;
+		return status;
+	}
+}
+
+void setCostsByRadius(int xPos, int yPos, int xMax, int yMax, int radius, float cost)
+{
+	int yStart, yEnd, xStart, xEnd;
+	
+	if(xPos-radius <0)
+		xStart= xPos;
+	else
+		xStart= xPos-radius;
+
+	if(yPos-radius <0)
+		yStart= yPos;
+	else
+		yStart= yPos-radius;
+
+	if(xPos+radius >xMax)
+		xEnd= xPos;
+	else
+		xEnd= xPos+radius;
+
+	if(yPos+radius >yMax)
+		yEnd= yPos;
+	else
+		yEnd= yPos+radius;
+
+	for(int y= yStart; y<= yEnd ; y++)
+	{
+		for(int x=xStart; x<= xEnd;x++)
+		{
+			for(int k=0;k<K;k++)
+			{
+				c[x][y][k]= cost;
+			}
+		}
+
+	}
+}
+
+void printNetworkUsage(vector< vector< vector<int> > > &flow)
+{
+	if (flow.size() > 0)
+	{
+		for (unsigned int i = 0; i < flow.size(); i++)
+		{
+			for (unsigned int j = 0; j < flow[0].size(); j++)
+			{
+				int acc = 0;
+				for (unsigned int k = 0; k < flow[0][0].size(); k++)
+				{
+					if (flow[i][j][k]>0)
+						acc += flow[i][j][k];
+				}
+				if (acc > 0)
+					cout << "Flusso sul link (" << i << "," << j << "): " << acc << "/" << u[i][j] << endl;
+			}
+		}
+	}
+	else
+	{
+		cerr << __FUNCTION__ << "(): Strutture dati non allocate." << endl;
+	}
+}
+
+void printNodesIOFlow()
+{
+	if (t.size() > 0)
+	{
+		int accIN = 0, accOUT = 0;
+		for (int i = 0; i < n; i++)
+		{
+			accIN = 0, accOUT = 0;
+			cout << i << ")";
+			for (int j = 0; j < n; j++)
+			{
+				if (i != j)
+				{
+					accOUT += t[i][j];
+					accIN += t[j][i];
+				}
+			}
+			cout << "Out= " << accOUT << " In= " << accIN << " Tot= " << accOUT + accIN << endl;
+		}
+	}
+	else
+	{
+		cerr << __FUNCTION__ << "(): Strutture dati non allocate." << endl;
+	}
+}
+ 
 void setupLP(CEnv env, Prob lp)
 {
 	//allocazione mappe
 	vector< vector< vector<int> > > fMap(totalPotentialNodes, vector< vector<int> >(totalPotentialNodes, vector<int>(K, -1)));
+	
 	vector< vector<int> > xMap(totalPotentialNodes, vector<int>(totalPotentialNodes, -1));
 
 	vector< vector<int> > wMap(totalPotentialNodes, vector<int>(totalPotentialNodes, -1));
+
+	vector< vector<int> > zMap(P, vector<int>(P, -1));
 
 	int baseDroneIndex = n;
 
@@ -249,7 +1033,7 @@ void setupLP(CEnv env, Prob lp)
 		{
 			for (int j = 0; j < totalPotentialNodes; j++)
 			{
-				
+
 				//if (i != j) //c'è un arco tra i nodi i e j, quindi creo la corrispondente variabile di flusso fijk
 				if (i != j && (c[i][j][k] <= threshold && u[i][j]>0) && !(i < n && j < n)) //***
 				{
@@ -269,7 +1053,7 @@ void setupLP(CEnv env, Prob lp)
 		}
 	}
 
-	printf("Sono state create %d variabili f_i_j_k\n", CPXgetnumcols(env, lp)); //numero totale delle vars create	
+	cout << "Sono state create " << CPXgetnumcols(env, lp) << " variabili f_i_j_k" << endl; //numero totale delle vars create	
 
 	//numerazione nodi: da 0 a n sono gli utenti, da n a n+d sono le posizioni potenziali
 	//inserimento delle variabili y_i
@@ -288,7 +1072,7 @@ void setupLP(CEnv env, Prob lp)
 
 
 	}
-	printf("Sono state create %d variabili y_i\n", CPXgetnumcols(env, lp) - y_index); //numero totale delle vars create	
+	cout << "Sono state create " << CPXgetnumcols(env, lp)- y_index << " variabili y_i" << endl; //numero totale delle vars create	
 
 	//aggiunta delle variabili x_i_j
 
@@ -343,7 +1127,7 @@ void setupLP(CEnv env, Prob lp)
 		}
 	}
 
-	printf("Sono state create %d variabili x_i_j\n", CPXgetnumcols(env, lp) - x_index); //numero totale delle vars create	
+	cout << "Sono state create " << CPXgetnumcols(env, lp) - x_index << " variabili x_i_j" << endl; //numero totale delle vars create	
 
 	//aggiunta variabili  w_i_j
 	int w_index = CPXgetnumcols(env, lp);
@@ -369,9 +1153,33 @@ void setupLP(CEnv env, Prob lp)
 		}
 	}
 
-	printf("Sono state create %d variabili w_i_j\n", CPXgetnumcols(env, lp) - w_index); //numero totale delle vars create	
+	cout << "Sono state create " << CPXgetnumcols(env, lp) - w_index << " variabili w_i_j" << endl;  //numero totale delle vars create	
 
-	
+	//aggiunta variabili z_i_j
+	int z_index = CPXgetnumcols(env,lp);
+	int zMapIndex = z_index;
+	for (int i = n; i < totalPotentialNodes; i++)
+	{
+		char ztype = 'B'; //***
+		double lb = 0.0;
+		double ub = 1.0;
+		for(int j = n; j < totalPotentialNodes; j++)
+		{
+			if(i!=j)
+			{
+				snprintf(name, NAME_SIZE, "z_%d_%d", i, j); //scrive il nome della variabile z_i_j sulla stringa name[]
+				char* zname = (char*)(&name[0]);
+				CHECKED_CPX_CALL(CPXnewcols, env, lp, 1, &zero, &lb, &ub, &ztype, &zname);   //costruisce la singola variabile 
+
+				//costruzione della mappa
+				zMap[i-n][j-n] = zMapIndex; //TODO: sistemare gli indici
+				zMapIndex++;
+			}
+		}
+	} 
+
+	cout << "Sono state create " << CPXgetnumcols(env, lp) - z_index << " variabili z_i_j" << endl;  //numero totale delle vars create
+
 	//vincoli
 
 	char sense;
@@ -382,7 +1190,7 @@ void setupLP(CEnv env, Prob lp)
 	int rowNumber = 0;
 
 	// 1. capacità dei link
-	sense = 'L';
+	/*sense = 'L';
 	matbeg = 0;
 	for (int i = 0; i < totalPotentialNodes; i++)
 	{
@@ -393,7 +1201,7 @@ void setupLP(CEnv env, Prob lp)
 			//if (i != j && graph[i][j] != 0)
 			//if (i != j && (!areOutOfSight(i, j) && u[i][j]>0))
 			//if (i != j && graph[i][j] != 0)
-			if(i != j) //***
+			if (i != j) //***
 			{
 				for (int k = 0; k < K; k++)
 				{
@@ -421,8 +1229,8 @@ void setupLP(CEnv env, Prob lp)
 			}
 		}
 	}
-	cout << "Vincoli (1) creati\n" << endl;
-	
+	cout << "Vincoli (1) creati\n" << endl;*/
+
 	// 2. conservazione flusso
 	sense = 'E';
 	matbeg = 0;
@@ -436,7 +1244,7 @@ void setupLP(CEnv env, Prob lp)
 			{
 				//if (i != v && graph[i][v] != 0)
 				//if (i != v && !(v < n && i < n)) //condizione più generale, include le fijk di nodi tra cui non ci sono link
-				if(i!=v && fMap[i][v][k]!=-1) //*** a meno della presenza di nodi isolati, ci sarà per ogni vincolo almeno una coppia di f tc fmap[][][]!=-1
+				if (i != v && fMap[i][v][k] != -1) //*** a meno della presenza di nodi isolati, ci sarà per ogni vincolo almeno una coppia di f tc fmap[][][]!=-1
 				{
 					idx.push_back(fMap[i][v][k]);
 					coef.push_back(1.0);
@@ -446,7 +1254,7 @@ void setupLP(CEnv env, Prob lp)
 			for (int j = 0; j < totalPotentialNodes; j++)
 			{
 				//if (v != j && graph[v][j] != 0)
-				if (v != j && fMap[v][j][k]!=-1) //***condizione più generale, include le fijv di nodi tra cui non ci sono link
+				if (v != j && fMap[v][j][k] != -1) //***condizione più generale, include le fijv di nodi tra cui non ci sono link
 				{
 					idx.push_back(fMap[v][j][k]);
 					coef.push_back(-1.0);
@@ -457,17 +1265,17 @@ void setupLP(CEnv env, Prob lp)
 			char* rowname = (char*)(&name[0]);
 			rowNumber++;
 
-			
+
 			CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idx.size(), &b[v][k], &sense, &matbeg, &idx[0], &coef[0], NULL, &rowname);
 			idx.clear();
 			coef.clear();
-			
+
 		}
 	}
 	cout << "Vincoli (2) creati\n" << endl;
-	
+
 	// 3. capacita' effettiva
-	sense = 'E';
+	/*sense = 'L';
 	matbeg = 0;
 	coef.clear();
 	idx.clear();
@@ -523,25 +1331,7 @@ void setupLP(CEnv env, Prob lp)
 			}
 		}
 	}
-	cout << "Vincoli (3) creati\n" << endl;
-	CHECKED_CPX_CALL(CPXwriteprob, env, lp, "vartest.lp", NULL);
-	// 4. legame tra variabili u_i_j e x_i_j
-	/*sense = 'L';
-	matbeg = 0;
-	for (int i = 0; i < totalPotentialNodes; i++)
-	{
-	int idx = 0;
-	double coef = 0;
-	for (int j = 0; j < totalPotentialNodes; j++)
-	{
-	if (i != j && graph[i][j] != 0)
-	{
-	idx = xMap[i][j];
-	coef = 1.0;
-	CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, 1, &u[i][j], &sense, &matbeg, &idx, &coef, NULL, NULL);
-	}
-	}
-	}*/
+	cout << "Vincoli (3) creati\n" << endl;*/
 
 	// 4. legame tra variabili x_i_j e y_j
 	sense = 'L';
@@ -576,27 +1366,6 @@ void setupLP(CEnv env, Prob lp)
 
 	cout << "Vincoli (4) creati\n" << endl;
 
-	// 6. ogni nodo deve essere in grado di connettersi ad almeno un drone
-	/*sense = 'G';
-	matbeg = 0;
-	coef.clear();
-	idx.clear();
-	for (int i = 0; i < n+d; i++)
-	{
-	for (int v = baseDroneIndex; v < n+d; v++)
-	{
-	if (i != v)
-	{
-	idx.push_back(xMap[i][v]);
-	coef.push_back(1.0);
-	}
-	}
-	CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idx.size(), &uno, &sense, &matbeg, &idx[0], &coef[0], NULL, NULL);
-	idx.clear();
-	coef.clear();
-	}*/
-
-
 	// 5. un drone non puo' mantenere piu' di s potenziali connessioni simultanee
 	sense = 'L';
 	matbeg = 0;
@@ -604,17 +1373,17 @@ void setupLP(CEnv env, Prob lp)
 	idx.clear();
 	for (int v = baseDroneIndex; v < totalPotentialNodes; v++)
 	{
-		double temp_s = (double) s;
+		double temp_s = (double)s;
 		for (int i = 0; i < totalPotentialNodes; i++)
 		{
 			//if (i != v)
-			if(xMap[i][v] != -1) //***
+			if (xMap[i][v] != -1) //***
 			{
 				idx.push_back(xMap[i][v]);
 				coef.push_back(1.0);
 			}
 		}
-		
+
 		if (idx.size() > 0) //***
 		{
 
@@ -641,7 +1410,7 @@ void setupLP(CEnv env, Prob lp)
 		idx.push_back(y_index + i);
 		coef.push_back(1.0);
 	}
-	
+
 	snprintf(name, NAME_SIZE, "c_%d", rowNumber); //numerazione progressiva dei vincoli
 	char* rowname = (char*)(&name[0]);
 	rowNumber++;
@@ -664,7 +1433,7 @@ void setupLP(CEnv env, Prob lp)
 			{
 				for (int k = 0; k < K; k++)
 				{
-					if (c[i][j][k] > threshold && fMap[i][j][k]!=-1) //***
+					if (c[i][j][k] > threshold && fMap[i][j][k] != -1) //***
 					{
 						double coef = 1.0;
 						int idx = fMap[i][j][k];
@@ -681,93 +1450,6 @@ void setupLP(CEnv env, Prob lp)
 	}
 	cout << "Vincoli (7) creati\n" << endl;
 
-	//remove duplicate
-	/*for (int i = baseDroneIndex; i < n+d; i++)
-	{
-	for (int j = 0; j < totalPotentialNodes; j++)
-	{
-	if (i != j)
-	{
-	for (int k = 0; k < K; k++)
-	{
-	if (c[i][j][k] > threshold)
-	{
-	double coef = 1.0;
-	int idx = fMap[i][j][k];
-	CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, 1, &zero, &sense, &matbeg, &idx, &coef, NULL, NULL);
-
-	}
-	}
-	}
-	}
-	}*/
-
-
-
-	/*sense = 'L';
-	matbeg = 0;
-	for (int i = 0; i < n; i++)
-	{
-	for (int j = n; j < totalPotentialNodes; j++)
-	{
-	if (i != j)
-	{
-	double coef = c[i][j][0] - threshold;
-	int idx = xMap[i][j];
-	CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, 1, &zero, &sense, &matbeg, &idx, &coef, NULL, NULL);
-
-	}
-	}
-	}
-
-	for (int i = baseDroneIndex; i < totalPotentialNodes; i++)
-	{
-	for (int j = 0; j < totalPotentialNodes; j++)
-	{
-	if (i != j)
-	{
-	double coef = c[i][j][0] - threshold;
-	int idx = xMap[i][j];
-	CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, 1, &zero, &sense, &matbeg, &idx, &coef, NULL, NULL);
-
-	}
-	}
-	}*/
-	/*
-	// 11. in ogni posizione potenziale puo' esserci solo un drone
-	sense = 'L';
-	matbeg = 0;
-	coef.clear();
-	idx.clear();
-	for (int i = 0; i < P; i++)
-	{
-	for (int v = 0; v < d; v++)
-	{
-	idx.push_back(y_index + (d*i) + v);
-	coef.push_back(1.0);
-	}
-	CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idx.size(), &uno, &sense, &matbeg, &idx[0], &coef[0], NULL, NULL);
-	idx.clear();
-	coef.clear();
-	}
-
-	// 12. un drone può essere dislocato in una sola posizione potenziale
-	sense = 'L';
-	matbeg = 0;
-	coef.clear();
-	idx.clear();
-	for (int v = 0; v < d; v++)
-	{
-	for (int i = 0; i < P; i++)
-	{
-	idx.push_back(y_index + (d*i) + v);
-	coef.push_back(1.0);
-	}
-	CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idx.size(), &uno, &sense, &matbeg, &idx[0], &coef[0], NULL, NULL);
-	idx.clear();
-	coef.clear();
-	}
-	*/
 	// 8. legame tra le variabili x_i_j e f_i_j_k
 	//REWORKED
 	sense = 'L';
@@ -780,792 +1462,456 @@ void setupLP(CEnv env, Prob lp)
 		{
 			//if (i != j) //***
 			//{
-				//if (!(j < n && i < n)) //esclude i link i cui estremi sono entrambi nodi utenti //***
-				//{
-					//cout << i << " " << j << " passa" << endl;
-					for (int k = 0; k < K; k++)
-					{
-						if (fMap[i][j][k] != -1) //***
-						{
+			//if (!(j < n && i < n)) //esclude i link i cui estremi sono entrambi nodi utenti //***
+			//{
+			//cout << i << " " << j << " passa" << endl;
+			for (int k = 0; k < K; k++)
+			{
+				if (fMap[i][j][k] != -1) //***
+				{
 
 
-							idx.push_back(fMap[i][j][k]);
-							coef.push_back(1.0);
+					idx.push_back(fMap[i][j][k]);
+					coef.push_back(1.0);
 
-							// f_i_j_k - M * x_i_j
-							idx.push_back(xMap[i][j]);
-							coef.push_back(-bigM);
+					// f_i_j_k - M * x_i_j
+					idx.push_back(xMap[i][j]);
+					coef.push_back(-bigM);
 
-							snprintf(name, NAME_SIZE, "c_%d", rowNumber); //numerazione progressiva dei vincoli
-							char* rowname = (char*)(&name[0]);
-							rowNumber++;
+					snprintf(name, NAME_SIZE, "c_%d", rowNumber); //numerazione progressiva dei vincoli
+					char* rowname = (char*)(&name[0]);
+					rowNumber++;
 
-							CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idx.size(), &zero, &sense, &matbeg, &idx[0], &coef[0], NULL, &rowname);
-							idx.clear();
-							coef.clear();
-						}
-					}
-				//}
+					CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idx.size(), &zero, &sense, &matbeg, &idx[0], &coef[0], NULL, &rowname);
+					idx.clear();
+					coef.clear();
+				}
+			}
+			//}
 			//}
 		}
 	}
 	cout << "Vincoli (8) creati\n" << endl;
-}
 
-void saveInstance(const char *filename)
-{
-	ofstream file;
-	file.open(filename, ios::out);
-	if (file.is_open())
-	{
-		file << n << endl;
-		file << d << endl;
-		file << P << endl;
-		for (int i = 0; i < P; i++)
-		{
-			file << deployCost[i] << " ";
-		}
-		file << endl;
-
-		for (int i = 0; i < n; i++)
-		{
-			for (int j = 0; j < n; j++)
-			{
-				file << t[i][j] << " ";
-			}
-			file << endl;
-		}
-
-		for (int i = 0; i < totalPotentialNodes; i++)
-		{
-			for (int j = 0; j < totalPotentialNodes; j++)
-			{
-				file << u[i][j] << " ";
-			}
-			file << endl;
-		}
-
-		for (int i = 0; i < totalPotentialNodes; i++)
-		{
-			for (int j = 0; j < totalPotentialNodes; j++)
-			{
-				for (int k = 0; k < K; k++)
-				{
-					file << c[i][j][k] << " ";
-				}
-				file << endl;
-			}
-		}
-
-		file.close();
-	}
-	else
-		cout << "Impossibile aprire il file: " << filename << endl;
-}
-
-int initDataStructures(int n, int d, int P)
-{
-	int success = 0;
-	totalNodes = n + d;
-	totalPotentialNodes = n + P;
-	K = n*(n - 1);
-
-	try
-	{
-		//matrice nxn, init=-1
-		t.resize(n);
-		for (int i = 0; i < n; i++)
-		{
-			t[i].resize(n, -1);
-		}
-
-		//vettore P, init=-1
-		deployCost.resize(P, -1);
-
-		//matrice 3D (n+P)x(n+P)x(K), init=DISCONNECTED_COST
-		c.resize(totalPotentialNodes);
-		for (int i = 0; i < totalPotentialNodes; i++)
-		{
-			c[i].resize(totalPotentialNodes);
-			for (int j = 0; j < totalPotentialNodes; j++)
-			{
-				c[i][j].resize(K, DISCONNECTED_COST);
-			}
-		}
-
-		//matrice (n+P)x(n+P), init=-1
-		u.resize(totalPotentialNodes);
-		for (int i = 0; i < totalPotentialNodes; i++)
-		{
-			u[i].resize(totalPotentialNodes, -1);
-		}
-
-		//matrice (n+P)x(K), init=0
-		b.resize(totalPotentialNodes);
-		for (int i = 0; i < totalPotentialNodes; i++)
-		{
-			b[i].resize(K, 0);
-		}
-	}
-	catch (exception &e)
-	{
-		cout << "initDataSructures(): An exception occurred: " << e.what() << endl;
-		success = 1;
-	}
-	return success;
-}
-
-int loadInstance(const char *filename) //TODO: controlli su possibile istanza corrotta (getline)
-{
-	int result = 0;
-	ifstream file;
-
-	n = 0, d = 0, P = 0;
-
-	file.open(filename, ios::in);
-	if (file.is_open())
-	{
-		try
-		{
-			file >> n >> d >> P;
-			if (n > 0 && d > 0 && P > 0)
-			{
-				if (initDataStructures(n, d, P) == 0)
-				{
-					for (int i = 0; i < P; i++)
-					{
-						file >> deployCost[i];
-					}
-
-					for (int i = 0; i < n; i++)
-					{
-						for (int j = 0; j < n; j++)
-						{
-							file >> t[i][j];
-						}
-					}
-
-					for (int i = 0; i < totalPotentialNodes; i++)
-					{
-						for (int j = 0; j < totalPotentialNodes; j++)
-						{
-							file >> u[i][j];
-						}
-					}
-
-					for (int i = 0; i < totalPotentialNodes; i++)
-					{
-						for (int j = 0; j < totalPotentialNodes; j++)
-						{
-							for (int k = 0; k < K; k++)
-							{
-								file >> c[i][j][k];
-							}
-						}
-					}
-				}
-				else
-				{
-					cout << "loadInstance(): allocazione strutture fallita." << endl;
-					result = 1;
-				}
-			}
-			else
-			{
-				cout << "loadInstance(): Parametri dell'istanza " << filename << " errati." << endl;
-				result = 1;
-			}
-		}
-		catch (exception &e)
-		{
-			cout << "loadInstance(): errore nella lettura del file " << filename << ": " << e.what() << endl;
-			result = 1;
-		}
-		file.close();
-	}
-	else
-	{
-		cout << "loadInstance(): Impossibile aprire il file " << filename << endl;
-		result = 1;
-	}
-	return result;
-}
-
-//costruisce la matrice b partendo dalla matrice di traffico 
-//la matrice b e' pre-inizializzata al valore 0
-void convertIntoBMatrix()
-{
-	int k = 0; //commodity counter
-	for (unsigned int i = 0; i < t.size(); i++)
-	{
-		for (unsigned int j = 0; j < t.size(); j++)
-		{
-			if (i != j)
-			{
-				//copia i valori dalla matrice t alla b. I valori vengono resi negativi perche' il traffico e'"uscente" dai nodi
-				b[i][k] = t[i][j] * (-1);
-
-				//il traffico uscente dal nodo i al nodo j sara' visto come traffico entrante dal nodo j
-				b[j][k] = t[i][j];
-				k++;
-			}
-		}
-	}
-}
-
-
-//test sui file delle soluzioni
-int testSolutionFile(const char *reference, const char *test)
-{
-	ifstream refFile, tstFile;
-	int buf = 128, rowCount = 1, result = 0;
-	refFile.open(reference, ios::in);
-	tstFile.open(test, ios::in);
-	if (refFile.is_open() && tstFile.is_open())
-	{
-		cout << "Verifica file:" << endl;
-		char str1[buf], str2[buf];
-		while (!refFile.eof() && !tstFile.eof())
-		{
-			refFile.getline(str1, buf, '\n');
-			tstFile.getline(str2, buf, '\n');
-			if (strcmp(str1, str2) != 0)
-			{
-				cout << "diff in row " << rowCount << ": " << str1 << " " << str2 << endl;
-				result = 1;
-			}
-			rowCount++;
-		}
-		refFile.close();
-		tstFile.close();
-	}
-	else
-	{
-		cout << "Impossibile aprire i file: " << reference << " e/o " << test << endl;
-		result = -1;
-	}
-	if (result == 0)
-		cout << "File identici" << endl;
-	return result;
-}
-
-
-//generatore pseudo-casuale di numeri double nel range inf - sup
-/*double getdRand(double inf, double sup)
-{
-	double drand01 = ((double)rand()) / ((double)RAND_MAX); //drand(0,1)
-	return (drand01 * (sup - inf) + inf); //drand(inf,sup)
-}*/
-
-/*
-string getStatus(int code)
-{
-	switch (code)
-	{
-	case -1:
-		return "CPX_CONFLICT_EXCLUDED";
-		break;
-	case 1:
-		return "CPX_CONFLICT_POSSIBLE_LB";
-		break;
-	case 2:
-		return "CPX_CONFLICT_POSSIBLE_UB";
-		break;
-	case 3:
-		return "CPX_CONFLICT_MEMBER";
-		break;
-	case 4:
-		return "CPX_CONFLICT_LB";
-		break;
-	case 5:
-		return "CPX_CONFLICT_UB";
-		break;
-	default:
-		return "unknown";
-		break;
-	}
-}*/
-
-void saveSolution(CEnv env, Prob lp, int yBegin, solution_t &solution)
-{
-	int status = 0;
-	double objval=0;
-	CHECKED_CPX_CALL(CPXgetobjval, env, lp, &objval);
-
-	solution.objValue = objval;
+	// 9. vincoli sulla capacita' massima dei droni: Utx e Urx
+	/*sense = 'L';
+	matbeg = 0;
 	
-	solution.yPositions.resize(P);
+	for (int i = 0; i < totalPotentialNodes; i++)
+	{
+		
+		vector<int> idxTx, idxRx;
+		vector<double> coefTx, coefRx;
+		double temp_uTx=(double)droneTXCapacity;
+		double temp_uRx=(double)droneRXCapacity;
+		//sum of w_i_j
+		for (int j = 0; j < totalPotentialNodes; j++)
+		{
 
-	CHECKED_CPX_CALL(CPXgetx, env, lp, &(solution.yPositions[0]), yBegin, yBegin + P);
+			//Utx: trasmissione, solo archi diretti
+			if (i != j && wMap[i][j] != -1)//***
+			{
+				idxTx.push_back(wMap[i][j]);
+				coefTx.push_back(1.0);
+			}
+
+			//Urx: ricezione, solo archi inversi
+			if (i != j && wMap[j][i] != -1)//***
+			{
+				idxRx.push_back(wMap[j][i]);
+				coefRx.push_back(1.0);
+			}
+		}
+
+		if(idxTx.size() > 0)
+		{ 
+			snprintf(name, NAME_SIZE, "c_%d", rowNumber); //numerazione progressiva dei vincoli
+			char* rowname = (char*)(&name[0]);
+			rowNumber++;
+
+			CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idxTx.size(), &temp_uTx, &sense, &matbeg, &idxTx[0], &coefTx[0], NULL, &rowname);
+		}
+
+		if(idxRx.size() > 0)
+		{
+			rowNumber++;
+			snprintf(name, NAME_SIZE, "c_%d", rowNumber); //numerazione progressiva dei vincoli
+			char* rowname = (char*)(&name[0]);
+
+			CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idxRx.size(), &temp_uRx, &sense, &matbeg, &idxRx[0], &coefRx[0], NULL, &rowname);
+		}
+		idxTx.clear();
+		idxRx.clear();
+		coefTx.clear();
+		coefRx.clear();
+	}
+	cout << "Vincoli (9) creati\n" << endl;*/
+
+	//10. gestione interferenza
+
+	//TX 
+	//10.a
+	sense = 'L';
+	matbeg = 0;
+	//coef.clear();
+	//idx.clear();
+	for (int i = n; i < totalPotentialNodes; i++)
+	{
+		vector< int > idxTx, idxRx;
+		vector< double > coefTx, coefRx; 
+		//first sum A*f
+		for (int j = 0; j < totalPotentialNodes; j++)
+		{
+			for (int k = 0; k < K; k++)
+			{
+				if(i != j && fMap[i][j][k] != -1)
+				{
+					idxTx.push_back(fMap[i][j][k]);
+					coefTx.push_back(getDistanceCoef(i, j));
+
+					idxRx.push_back(fMap[j][i][k]);
+					coefRx.push_back(getDistanceCoef(j, i));
+				}
+			}
+		}
+
+		
+
+		//second sum z*B
+		for(int l=n; l< totalPotentialNodes; l++)
+		{
+			if(l != i)
+			{
+				idxTx.push_back(zMap[i-n][l-n]); //TODO: gestire meglio gli indici
+				coefTx.push_back(getInterferenceFactor(i,l));
+
+				idxRx.push_back(zMap[l-n][i-n]); //TODO: gestire meglio gli indici
+				coefRx.push_back(getInterferenceFactor(l,i));
+			}
+		}
+
+		//third sum
+
+		double sumBTx = 0;
+		double sumBRx = 0;
+		for(int v=0; v< n; v++)
+		{
+			sumBTx+= getInterferenceFactor(i,v);
+
+			sumBRx+= getInterferenceFactor(v,i);
+		}
+
+		//idx.push_back(y_index + i - n);
+		//coef.push_back(sumB);
+		
+		if(idxTx.size() > 0)
+		{
+			//add Utx*yi
+			idxTx.push_back(y_index + i - n);
+			coefTx.push_back(-droneTXCapacity+sumBTx);
+
+			
+			//add Utx
+			//idx.push_back(y_index + i - n);
+			//coef.push_back(- droneTXCapacity);
+
+			snprintf(name, NAME_SIZE, "c_%d", rowNumber); //numerazione progressiva dei vincoli
+			char* rowname = (char*)(&name[0]);
+			rowNumber++;
+
+
+			CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idxTx.size(), &zero, &sense, &matbeg, &idxTx[0], &coefTx[0], NULL, &rowname);
+			idxTx.clear();
+			coefTx.clear();
+		}
+
+		if(idxRx.size() > 0)
+		{
+			idxRx.push_back(y_index + i - n);
+			coefRx.push_back(-droneTXCapacity+sumBRx);
+
+			snprintf(name, NAME_SIZE, "c_%d", rowNumber); //numerazione progressiva dei vincoli
+			rowname = (char*)(&name[0]);
+			rowNumber++;
+
+
+			CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idxRx.size(), &zero, &sense, &matbeg, &idxRx[0], &coefRx[0], NULL, &rowname);
+			idxRx.clear();
+			coefRx.clear();
+
+		}
+	}
+
+	//10.b
+	sense = 'L';
+	matbeg = 0;
 	
-}
-
-void printSolution(solution_t solution)
-{
-	int count = 0;
-	cout << endl << "Soluzione istanza: " << endl;
-	cout << "Valore f. obiettivo: " << solution.objValue << endl;
-	for (unsigned int i = 0; i < solution.yPositions.size(); i++)
-	{
-		if (solution.yPositions[i] == 1)
-			count++;
-	}
-	cout << "Droni impiegati/droni totali: " << count << "/" << d << endl;
-
-	for (unsigned int i = 0; i < solution.yPositions.size(); i++)
-	{
-		cout << "y_" << i + n << ": " << (int)solution.yPositions[i] << endl;
-	}
-	cout << endl;
-
-}
-
-void printVarsValue(CEnv env, Prob lp)
-{
-	char **cur_colname = new char *[1];
-	int cur_storespace = 16;
-	char *cur_colnamestore = new char[cur_storespace];
-	int *surplus = new int[1];
-
-	vector<double> varVals;
-
-	//print solution (var values)
-	int n = CPXgetnumcols(env, lp);
-
-	varVals.resize(n);
-
-	cout << "Visualizzazione delle variabili: " << endl;
-	CHECKED_CPX_CALL(CPXgetx, env, lp, &varVals[0], 0, n - 1);
 	for (int i = 0; i < n; i++)
 	{
-		if (varVals[i] != 0)
+		double temp_uTx = droneTXCapacity;
+		double temp_uRx = droneRXCapacity;
+
+		vector< int > idxTx, idxRx;
+		vector< double > coefTx, coefRx; 
+
+		//first sum
+		for (int j = n; j < totalPotentialNodes; j++)
 		{
-			status = CPXgetcolname(env, lp, cur_colname, cur_colnamestore, cur_storespace, surplus, i, i);
-			if (status == 0)
-				cout << cur_colnamestore << " : " << varVals[i] << endl;
-			else
-				cout << "Var in position " << i << " : " << varVals[i] << endl;
-		}
-	}
-
-	delete[] surplus;
-	delete[] cur_colnamestore;
-	delete[] cur_colname;
-}
-
-
-
-void printSimplifiedSolFile(CEnv env, Prob lp, const char* solution)
-{
-	char **cur_colname = new char *[1];
-	int cur_storespace = 16;
-	char *cur_colnamestore = new char[cur_storespace];
-	int *surplus = new int[1];
-	double objval = 0;
-	vector<double> varVals;
-
-	//print unit test file
-	ofstream unitFile;
-	unitFile.open(solution, ios::out);
-	if (unitFile.is_open()) //TODO: eliminare condizione
-	{
-		cout << "File " << solution << " creato." << endl;
-
-		// print objval
-		CHECKED_CPX_CALL(CPXgetobjval, env, lp, &objval);
-		unitFile << "Objval: " << objval << endl;
-
-		//print solution (var values)
-		int n = CPXgetnumcols(env, lp);
-
-		varVals.resize(n);
-
-		CHECKED_CPX_CALL(CPXgetx, env, lp, &varVals[0], 0, n - 1);
-		/// status = CPXgetx (env, lp, x, 0, CPXgetnumcols(env, lp)-1);
-		for (int i = 0; i < n; i++)
-		{
-			if (varVals[i] != 0)
+			for (int k = 0; k < K; k++)
 			{
-				//
-				/// to get variable name, use the RATHER TRICKY "CPXgetcolname"
-				status = CPXgetcolname(env, lp, cur_colname, cur_colnamestore, cur_storespace, surplus, i, i);
-				if (status == 0)
+				if(i != j && fMap[i][j][k] != -1)
 				{
-					unitFile << cur_colnamestore << " : " << varVals[i] << endl;
-				}
-				else
-				{
-					unitFile << "Var in position " << i << " : " << varVals[i] << endl;
+					idxTx.push_back(fMap[i][j][k]);
+					coefTx.push_back(getDistanceCoef(i, j));
+
+					idxRx.push_back(fMap[j][i][k]);
+					coefRx.push_back(getDistanceCoef(j, i));
+
 				}
 			}
 		}
 
-		delete[] surplus;
-		delete[] cur_colnamestore;
-		delete[] cur_colname;
+		//second sum 
+		for(int l=n; l< totalPotentialNodes; l++)
+		{
+			if(l != i)
+			{
+				idxTx.push_back(y_index + l - n);
+				coefTx.push_back(getInterferenceFactor(i,l));
+
+				idxRx.push_back(y_index + l - n);
+				coefRx.push_back(getInterferenceFactor(l,i));
+			}
+		}
+
+		//third sum
+		//double sumB = 0;
+		//for(int v=0; v< n; v++)
+		//{
+		//	sumB+= getInterferenceFactor(i,v);
+		//}
+		
+		if(idxTx.size() > 0)
+		{
+			//add Utx
+			//idxTx.push_back(y_index + i - n);
+			//coef.push_back(- droneTXCapacity);
+
+			snprintf(name, NAME_SIZE, "c_%d", rowNumber); //numerazione progressiva dei vincoli
+			char* rowname = (char*)(&name[0]);
+			rowNumber++;
+
+
+			CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idxTx.size(), &temp_uTx, &sense, &matbeg, &idxTx[0], &coefTx[0], NULL, &rowname);
+			idxTx.clear();
+			coefTx.clear();
+		}
+
+		if(idxRx.size() > 0)
+		{
+			//add Utx
+			//idx.push_back(y_index + i - n);
+			//coef.push_back(- droneTXCapacity);
+
+			snprintf(name, NAME_SIZE, "c_%d", rowNumber); //numerazione progressiva dei vincoli
+			char* rowname = (char*)(&name[0]);
+			rowNumber++;
+
+
+			CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idxRx.size(), &temp_uRx, &sense, &matbeg, &idxRx[0], &coefRx[0], NULL, &rowname);
+			idxTx.clear();
+			coefTx.clear();
+		}
+
 		
 	}
-	unitFile.close();
-}
+	cout << "Vincoli (10) creati\n" << endl;
 
-void setCompleteGraph(double stdCost, int stdCap)
-{
-	for(int i=n; i< totalPotentialNodes; i++)
+	//11. ausiliario
+	sense = 'L';
+	matbeg = 0;
+	coef.clear();
+	idx.clear();
+
+	for(int i=n; i<totalPotentialNodes; i++)
 	{
-		for(int j=n; j< totalPotentialNodes; j++)
+		for(int l=n; l<totalPotentialNodes; l++)
 		{
-			if(i!=j)
+			if(i!=l)
 			{
-				for(int k=0;k<K ;k++)
-				{
-					c[i][j][k]= stdCost;
-				}
-				u[i][j]=stdCap;
-			}
-		} 
-	} 
-}
+				idx.push_back(y_index + i - n);
+				coef.push_back(1.0);
 
-int getSolutionFlowMatrix(CEnv env, Prob lp, vector< vector< vector<int> > > &flow)
-{
-	char **cur_colname = new char *[1];
-	int cur_storespace = 16;
-	char *cur_colnamestore = new char[cur_storespace];
-	int *surplus = new int[1];
-	vector<double> varVals;
-	char *tokens;
+				idx.push_back(y_index + l - n);
+				coef.push_back(1.0);
 
-	int indexes[3];
-	int status = 0;
-	//print solution (var values)
-	int n = CPXgetnumcols(env, lp);
+				idx.push_back(zMap[i-n][l-n]); //TODO: sistema indici
+				coef.push_back(-1.0);
 
-	varVals.resize(n);
-
-	CHECKED_CPX_CALL(CPXgetx, env, lp, &varVals[0], 0, n - 1);
-	int v = 0;
-	while(v < n && status==0)
-	{
-		/// to get variable name, use the RATHER TRICKY "CPXgetcolname"
-		status = CPXgetcolname(env, lp, cur_colname, cur_colnamestore, cur_storespace, surplus, v, v);
-		if (status == 0)
-		{
-			if(cur_colnamestore[0]!='f')
-			{
-				status=1;
-			}
-			else
-			{
-				int i = 0;
-				//cout<< "stringa: " << cur_colnamestore<<endl;
-				tokens = strtok(cur_colnamestore, "f_");
-				if(tokens!=NULL)
-					indexes[i] = atoi(tokens);
-				//cout << "token trovato: " << tokens << endl;
-				
-				while (tokens != NULL)
-				{
-					tokens = strtok(NULL, "f_");
-					if(tokens!=NULL)
-					{
-						i++;
-						//cout << "token trovato: " << tokens << endl;
-						indexes[i] = atoi(tokens);
-						
-					}
-				}
-				//cout<< "indici:\n"<< indexes[0] <<" "<< indexes[1] <<" "<< indexes[2]<<endl;
+				snprintf(name, NAME_SIZE, "c_%d", rowNumber); //numerazione progressiva dei vincoli
+				char* rowname = (char*)(&name[0]);
+				rowNumber++;
 
 
-				if (indexes[0] >= 0 && indexes[0] < totalPotentialNodes && indexes[1] >= 0 && indexes[1] < totalPotentialNodes && indexes[2] >= 0 && indexes[2] < K)
-				{
-					flow[indexes[0]][indexes[1]][indexes[2]] = varVals[v];
-				}
-				else
-				{
-					status = 1;
-				}
+				CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idx.size(), &uno, &sense, &matbeg, &idx[0], &coef[0], NULL, &rowname);
+				idx.clear();
+				coef.clear();
+
+				//Auxiliary constraint 1: zl - xi <= 0
+				idx.push_back(zMap[i-n][l-n]); //TODO: sistema indici
+				coef.push_back(1.0);
+				idx.push_back(y_index + i - n);
+				coef.push_back(-1.0);
+
+				snprintf(name, NAME_SIZE, "c_%d", rowNumber); //numerazione progressiva dei vincoli
+				rowname = (char*)(&name[0]);
+				rowNumber++;
+
+
+				CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idx.size(), &zero, &sense, &matbeg, &idx[0], &coef[0], NULL, &rowname);
+				idx.clear();
+				coef.clear();
+
+				//Auxiliary constraint 2: zl - xl <= 0
+				idx.push_back(zMap[i-n][l-n]); //TODO: sistema indici
+				coef.push_back(1.0);
+				idx.push_back(y_index + l - n);
+				coef.push_back(-1.0);
+
+				snprintf(name, NAME_SIZE, "c_%d", rowNumber); //numerazione progressiva dei vincoli
+				rowname = (char*)(&name[0]);
+				rowNumber++;
+
+
+				CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idx.size(), &zero, &sense, &matbeg, &idx[0], &coef[0], NULL, &rowname);
+				idx.clear();
+				coef.clear();
+
 			}
 		}
 		
-		v++;
-	}
-	return status;
-}
-
-void setCostsByRadius(int xPos, int yPos, int xMax, int yMax, int radius, float cost)
-{
-	int yStart, yEnd, xStart, xEnd;
-	
-	if(xPos-radius <0)
-		xStart= xPos;
-	else
-		xStart= xPos-radius;
-
-	if(yPos-radius <0)
-		yStart= yPos;
-	else
-		yStart= yPos-radius;
-
-	if(xPos+radius >xMax)
-		xEnd= xPos;
-	else
-		xEnd= xPos+radius;
-
-	if(yPos+radius >yMax)
-		yEnd= yPos;
-	else
-		yEnd= yPos+radius;
-
-	for(int y= yStart; y<= yEnd ; y++)
-	{
-		for(int x=xStart; x<= xEnd;x++)
-		{
-			for(int k=0;k<K;k++)
-			{
-				c[x][y][k]= cost;
-			}
-		}
-
 	}
 }
 
-void printNetworkUsage(vector< vector< vector<int> > > &flow)
-{
-	for(unsigned int i=0;i<flow.size();i++)
-	{
-		for(unsigned int j=0;j<flow[0].size();j++)
-		{
-			int acc=0;
-			for(unsigned int k=0;k<flow[0][0].size();k++)
-			{
-				if(flow[i][j][k]>0)
-					acc+=flow[i][j][k];
-			}
-			if(acc>0)
-				cout << "Flusso sul link ("<<i<<","<<j<<"): "<<acc<<"/"<<u[i][j]<<endl;
-		}
-	}
-}
-
-void printNodesIOFlow()
-{
-	int accIN = 0, accOUT = 0;
-	for (int i = 0; i < n; i++)
-	{
-		accIN = 0, accOUT = 0;
-		cout << i << ")";
-		for (int j = 0; j < n; j++)
-		{
-			if (i != j)
-			{
-				accOUT += t[i][j];
-				accIN += t[j][i];
-			}
-		}
-		cout << "Out= " << accOUT << " In= " << accIN << " Tot= " << accOUT + accIN << endl;
-	}
-}
- 
 int main(int argc, char const *argv[])
 {
-	string lpFile("flow2.lp"), solution("solution2.txt"), instance("test2.txt"), solFile("flow2.sol"), clpFile("conflict.clp");
-
-	solution_t instSolution;
-
+	string lpFile("flow4.lp"), solution("solution4.txt"), instance("test4.txt"), solFile("flow4.sol"), clpFile("conflict.clp");
+	solution_t *instSolution=NULL;
 	//dichiarazione dei timepoint/epoch (strutture dati in cui porre i tempi di inizio e fine dell'esecuzione di ogni istanza) 
 	high_resolution_clock::time_point start, end;
 
 	srand(time(NULL)); /* seed random number generator */
 
-	loadInstance(instance.c_str());
+	vector<nodesCoordinates_t> grid=createGrid(6,4,1.0);
+	printGrid(grid);
 
-	
-
-	cout << "Instance " << instance << " loaded." << endl;
-	cout << "Users: " << n << endl;
-	cout << "Drones: " << d << endl;
-	cout << "Potential drones positions: " << P << endl << endl;
-	convertIntoBMatrix();
-	//buildAdjMatrix(threshold);
-
-	printf("\nb matrix:\n");
-	for (int i = 0; i < totalPotentialNodes; i++)
+	if (loadInstance(instance.c_str()) != 0)
 	{
-		for (int j = 0; j < K; j++)
+		cerr << __FUNCTION__ <<" Impossibile caricare l'istanza: " << instance << endl;
+	}
+	else
+	{
+		cout << "Instance " << instance << " loaded." << endl;
+		cout << "Users: " << n << endl;
+		cout << "Drones: " << d << endl;
+		cout << "Potential drones positions: " << P << endl << endl;
+		convertIntoBMatrix();
+		//buildAdjMatrix(threshold);
+
+		printf("\nb matrix:\n");
+		for (int i = 0; i < totalPotentialNodes; i++)
 		{
-			printf("%.0f  ", b[i][j]);
+			for (int j = 0; j < K; j++)
+			{
+				printf("%.0f  ", b[i][j]);
+			}
+			printf("\n");
 		}
-		printf("\n");
-	}
-/*
-	for (int k = 0; k < K; k++)
-	{
-		c[0][6][k] = 10;
-		c[6][0][k] = 10;
 
-		c[0][12][k] = 10;
-		c[12][0][k] = 10;
+		//saveInstance(instance.c_str());
+		printNodesIOFlow();
+		try
+		{
+			// init
+			DECL_ENV(env);
+			DECL_PROB(env, lp);
 
-		c[1][6][k] = 10;
-		c[6][1][k] = 10;
+			CPXsetintparam(env, CPX_PARAM_CONFLICTDISPLAY, 2);
 
-		c[1][12][k] = 10;
-		c[12][1][k] = 10;
+			// setup LP
+			setupLP(env, lp);
+			CHECKED_CPX_CALL(CPXwriteprob, env, lp, lpFile.c_str(), NULL);
+			// optimize
 
-		c[1][18][k] = 10;
-		c[18][1][k] = 10;
-		
-		c[2][24][k] = 10;
-		c[24][2][k] = 10;
-
-		c[2][25][k] = 10;
-		c[25][2][k] = 10;
-		
-		c[2][26][k] = 10;
-		c[26][2][k] = 10;
-		
-		c[3][28][k] = 10;
-		c[28][3][k] = 10;
-
-		c[3][29][k] = 10;
-		c[29][3][k] = 10;
-
-		c[4][29][k] = 10;
-		c[29][4][k] = 10;
-		
-		c[4][23][k] = 10;
-		c[23][4][k] = 10;
-		
-		c[4][17][k] = 10;
-		c[17][4][k] = 10;
-		
-		c[4][11][k] = 10;
-		c[11][4][k] = 10;
-		
-		c[5][11][k] = 10;
-		c[11][5][k] = 10;
-		
-	}
-
-		u[0][6]= 300;
-		u[6][0]= 300;
-
-		u[0][12] = 300;
-		u[12][0] = 300;
-
-		u[1][6]= 130;
-		u[6][1]= 130;
-
-		u[1][12] = 300;
-		u[12][1] = 300;
-
-		u[1][18] = 300;
-		u[18][1] = 300;
-		
-		u[2][24] = 300;
-		u[24][2] = 300;
-
-		u[2][25] = 300;
-		u[25][2] = 300;
-		
-		u[2][26] = 300;
-		u[26][2] = 300;
-		
-		u[3][28] = 300;
-		u[28][3] = 300;
-
-		u[3][29] = 300;
-		u[29][3] = 300;
-
-		u[4][29] = 300;
-		u[29][4] = 300;
-		
-		u[4][23] = 300;
-		u[23][4] = 300;
-		
-		u[4][17] = 300;
-		u[17][4] = 300;
-		
-		u[4][11] = 300;
-		u[11][4] = 300;
-		
-		u[5][11] = 300;
-		u[11][5] = 300;
-*/
-
-	//setCompleteGraph(10.0,300);
-	//randomizeTraffic(0,50);
-
-	saveInstance(instance.c_str());
-	printNodesIOFlow();
-	try
-	{
-		// init
-		DECL_ENV(env);
-		DECL_PROB(env, lp);
-
-		CPXsetintparam(env, CPX_PARAM_CONFLICTDISPLAY, 2);
-
-		// setup LP
-		setupLP(env, lp);
-		CHECKED_CPX_CALL(CPXwriteprob, env, lp, lpFile.c_str(), NULL); 
-		// optimize
-
-		start = high_resolution_clock::now(); //timestamp di inizio
+			start = high_resolution_clock::now(); //timestamp di inizio
 			CHECKED_CPX_CALL(CPXmipopt, env, lp);
-		end = high_resolution_clock::now(); //timestamp di fine
+			end = high_resolution_clock::now(); //timestamp di fine
 
-		std::cout << "Istanza eseguita in "
-			<< duration_cast<milliseconds>(end - start).count() //casting per la conversione in millisecondi; (end-start).count() calcola la differenza di tempo e la restituisce come valore numerico
-			<< "ms" << " (" << duration_cast<seconds>(end - start).count() << "s c.ca).\n";
-		cout << "--------------------------------------------" << endl;
+			std::cout << "Istanza eseguita in "
+				<< duration_cast<milliseconds>(end - start).count() //casting per la conversione in millisecondi; (end-start).count() calcola la differenza di tempo e la restituisce come valore numerico
+				<< "ms" << " (" << duration_cast<seconds>(end - start).count() << "s c.ca).\n";
+			cout << "--------------------------------------------" << endl;
 
-		status = CPXgetstat(env, lp);
+			status = CPXgetstat(env, lp);
 
-		cout << "status code: " << status << endl;
+			cout << "Status code: " << status << endl;
 
-		if (status == 103) //CPXMIP_INFEASIBLE 
-		{
-			// infeasibility detected
-			int confnumrows = 0, confnumcols = 0;
+			if (status == 103) //CPXMIP_INFEASIBLE 
+			{
+				// infeasibility detected
+				int confnumrows = 0, confnumcols = 0;
 
-			cout << "CPXMIP_INFEASIBLE: infeasibility detected." << endl;
+				cout << "CPXMIP_INFEASIBLE: infeasibility detected." << endl;
 
-			status = CPXrefineconflict(env, lp, &confnumrows, &confnumcols);
-			cout << "Number of conflicting rows: " << confnumrows << endl;
-			cout << "Number of conflicting columns: " << confnumcols << endl;
+				status = CPXrefineconflict(env, lp, &confnumrows, &confnumcols);
+				cout << "Number of conflicting rows: " << confnumrows << endl;
+				cout << "Number of conflicting columns: " << confnumcols << endl;
 
-			status = CPXclpwrite(env, lp, clpFile.c_str());
-			if (status == 0)
-				cout << "Conflict file " << clpFile << " created." << endl;
+				status = CPXclpwrite(env, lp, clpFile.c_str());
+				if (status == 0)
+					cout << "Conflict file " << clpFile << " created." << endl;
+				else
+					cout << "Failed to create " << clpFile << " conflict file." << endl;
+
+			}
+			
+			instSolution = saveSolution(env, lp, y_index);
+			if (instSolution == NULL)
+			{
+				cerr << __FUNCTION__ << "(): Impossibile salvare la soluzione dell'istanza risolta." << endl;
+			}
 			else
-				cout << "Failed to create " << clpFile << " conflict file." << endl;
+			{
+				printSolution(instSolution);
+			}
+			
+			printSimplifiedSolFile(env, lp, solution.c_str());
+			
+			printVarsValue(env, lp);
+			
+			vector< vector< vector<int> > > flow(totalPotentialNodes, vector< vector<int> >(totalPotentialNodes, vector<int>(K, -1)));
+			getSolutionFlowMatrix(env, lp, flow);
+			printNetworkUsage(flow);
+			//testSolutionFile("refIST3.txt", solution.c_str());
+
+			//vector<double> y(P, 0);
+			//status = CPXgetx(env, lp, y, y_index, y_index+P);
+
+			CHECKED_CPX_CALL(CPXsolwrite, env, lp, solFile.c_str());
+			// free
+			CPXfreeprob(env, &lp);
+			CPXcloseCPLEX(&env);
+			if (instSolution != NULL)
+			{
+				delete[] instSolution->yPositions;
+				delete instSolution;
+			}
 
 		}
-
-		saveSolution(env, lp, y_index, instSolution);
-		printSolution(instSolution);
-
-		printSimplifiedSolFile(env, lp, solution.c_str());
-		printVarsValue(env,lp);
-
-		vector< vector< vector<int> > > flow(totalPotentialNodes, vector< vector<int> >(totalPotentialNodes, vector<int>(K, -1)));
-		getSolutionFlowMatrix(env,lp,flow);
-		printNetworkUsage(flow);
-		testSolutionFile("refIST3.txt", solution.c_str());
-
-		//vector<double> y(P, 0);
-		//status = CPXgetx(env, lp, y, y_index, y_index+P);
-
-		CHECKED_CPX_CALL(CPXsolwrite, env, lp, solFile.c_str());
-		// free
-		CPXfreeprob(env, &lp);
-		CPXcloseCPLEX(&env);
+		catch (exception& e)
+		{
+			cerr << __FUNCTION__ << "(): An exception has occurred: " << e.what() << endl;
+		}
+		return 0;
 	}
-	catch (exception& e)
-	{
-		cout << ">>>EXCEPTION: " << e.what() << endl;
-	}
-	return 0;
 }
