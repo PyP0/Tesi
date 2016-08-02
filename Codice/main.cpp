@@ -116,7 +116,7 @@ solution_t *executeInstance(string fileName, bool verbose)
 							printSolution(instSolution);
 					}
 
-					if(verbose == true)
+					//if(verbose == true)
 						CHECKED_CPX_CALL(CPXsolwrite, env, lp, solFile.c_str());
 				}
 			}

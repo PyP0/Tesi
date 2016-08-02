@@ -26,15 +26,7 @@ int z_index = 0;
 
 int bigM = 100000; // TODO: bigM deve essere maggiore della capacità massima dei link
 
-int getBigM()
-{
-	return bigM;
-}
 
-static int estimateBigM() //TODO migliore stima + set variabile bigm
-{
-	return max(2*getPosNum(),3*getRXCapacity());
-}
 
 static int getSolutionFlowMatrix(CEnv env, Prob lp, vector< vector< vector<int> > > &flow)
 {
@@ -168,7 +160,7 @@ static void setupLP(CEnv env, Prob lp)
 				if (i != j && (c[i][j][k] <= getThreshold()) && !(i < getUsrsNum() && j < getUsrsNum())) //***
 				//if (i != j && (c[i][j][k] <= threshold ) && !(i < n && j < n)) //*** TODO: senza le uij, va rivisto
 				{
-					char ftype = 'I';
+					char ftype = 'I'; //I***
 					double lb = 0.0;
 					double ub = CPX_INFBOUND;
 
@@ -221,7 +213,7 @@ static void setupLP(CEnv env, Prob lp)
 			if (!areOutOfSight(i, j)) //***
 			//if (!areOutOfSight(i, j)) //***
 			{
-				char xtype = 'B';
+				char xtype = 'B'; 
 				double lb = 0.0;
 				double ub = 1.0;
 
@@ -246,7 +238,7 @@ static void setupLP(CEnv env, Prob lp)
 			if (i != j && (!areOutOfSight(i, j) )) //***
 															   //if (i != j && (!areOutOfSight(i, j))) //***
 			{
-				char xtype = 'B';
+				char xtype = 'B'; 
 				double lb = 0.0;
 				double ub = 1.0;
 
@@ -269,7 +261,7 @@ static void setupLP(CEnv env, Prob lp)
 	//int zMapIndex = z_index;
 	for (int i = 0; i < getTotalPotentialNodes(); i++)
 	{
-		char ztype = 'B'; 
+		char ztype = 'B';  
 		double lb = 0.0;
 		double ub = 1.0;
 		
@@ -311,7 +303,7 @@ static void setupLP(CEnv env, Prob lp)
 	//int zMapIndex = z_index;
 	for (int i = 0; i < getTotalPotentialNodes(); i++)
 	{
-		char stype = 'B'; 
+		char stype = 'B';  
 		double lb = 0.0; 
 		double ub = 1.0;
 		
@@ -323,7 +315,12 @@ static void setupLP(CEnv env, Prob lp)
 
 	cout << "Sono state create " << CPXgetnumcols(env, lp) - supera_index << " variabili sp_i" << endl;  //numero totale delle vars create
 
-	//vincoli
+	//=========================================================================
+	//=========================================================================
+	//									vincoli
+	//=========================================================================
+	//=========================================================================
+
 
 	char sense;
 	int matbeg;
@@ -331,224 +328,14 @@ static void setupLP(CEnv env, Prob lp)
 	vector<double> coef;
 
 	int rowNumber = 0;
+	double bigM = 0.0;
 
-	// 2. conservazione flusso
-	sense = 'E';
-	matbeg = 0;
-	coef.clear();
-	idx.clear();
-	for (int v = 0; v < getTotalPotentialNodes(); v++)
-	{
-		for (int k = 0; k < getCommsNum(); k++)
-		{
-			for (int i = 0; i < getTotalPotentialNodes(); i++)
-			{
-				//if (i != v && graph[i][v] != 0)
-				//if (i != v && !(v < n && i < n)) //condizione più generale, include le fijk di nodi tra cui non ci sono link
-				if (i != v && fMap[i][v][k] != -1) //*** a meno della presenza di nodi isolati, ci sarà per ogni vincolo almeno una coppia di f tc fmap[][][]!=-1
-				{
-					idx.push_back(fMap[i][v][k]);
-					coef.push_back(1.0);
-				}
-			}
+	// 1.0 addition //
 
-			for (int j = 0; j < getTotalPotentialNodes(); j++)
-			{
-				//if (v != j && graph[v][j] != 0)
-				if (v != j && fMap[v][j][k] != -1) //***condizione più generale, include le fijv di nodi tra cui non ci sono link
-				{
-					idx.push_back(fMap[v][j][k]);
-					coef.push_back(-1.0);
-				}
-			}
-
-			snprintf(name, NAME_SIZE, "c2_%d", rowNumber); //numerazione progressiva dei vincoli
-			char* rowname = (char*)(&name[0]);
-			rowNumber++;
-
-
-			CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idx.size(), &b[v][k], &sense, &matbeg, &idx[0], &coef[0], NULL, &rowname);
-			idx.clear();
-			coef.clear();
-
-		}
-	}
-	cout << "Vincoli (2) creati\n" << endl;
-
-	// 3. legame tra variabili x_i_j e y_j
-	sense = 'L';
-	matbeg = 0;
-	coef.clear();
-	idx.clear();
-	for (int j = getUsrsNum(); j < getTotalPotentialNodes(); j++)
-	{
-		for (int i = 0; i < getTotalPotentialNodes(); i++)
-		{
-			//if (i != j && graph[i][j] != 0)
-			//if (i != j && xMap[i][j] != -1) //***
-			if (i != j && xMap[i][j] != -1 && xMap[j][i] != -1) //***
-			{
-				//add x_i_j
-				idx.push_back(xMap[i][j]);
-				coef.push_back(1.0);
-
-				//add -y_j
-				idx.push_back(y_index + (j - getUsrsNum()));
-				coef.push_back(-1.0);
-
-				snprintf(name, NAME_SIZE, "c3_%d", rowNumber); //numerazione progressiva dei vincoli
-				char* rowname = (char*)(&name[0]);
-				rowNumber++;
-
-				CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idx.size(), &zero, &sense, &matbeg, &idx[0], &coef[0], NULL, &rowname);
-
-				//add x_j_i
-				idx[0] = xMap[j][i];
-				
-
-				snprintf(name, NAME_SIZE, "c3_%d", rowNumber); //numerazione progressiva dei vincoli
-				rowname = (char*)(&name[0]);
-				rowNumber++;
-
-				CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idx.size(), &zero, &sense, &matbeg, &idx[0], &coef[0], NULL, &rowname);
-				idx.clear();
-				coef.clear();
-			}
-		}
-	}
-
-	cout << "Vincoli (3) creati\n" << endl;
-
-	// 4. un drone non puo' mantenere piu' di s potenziali connessioni simultanee
-	sense = 'L';
-	matbeg = 0;
-	coef.clear();
-	idx.clear();
-	for (int v = getUsrsNum(); v < getTotalPotentialNodes(); v++)
-	{
-		double temp_s = (double)getMaxConnections();
-		for (int i = 0; i < getTotalPotentialNodes(); i++)
-		{
-			//if (i != v)
-			if (xMap[i][v] != -1) //***
-			{
-				idx.push_back(xMap[i][v]);
-				coef.push_back(1.0);
-			}
-		}
-
-		if (idx.size() > 0) //***
-		{
-
-			snprintf(name, NAME_SIZE, "c4_%d", rowNumber); //numerazione progressiva dei vincoli
-			char* rowname = (char*)(&name[0]);
-			rowNumber++;
-
-			CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idx.size(), &temp_s, &sense, &matbeg, &idx[0], &coef[0], NULL, &rowname);
-			idx.clear();
-			coef.clear();
-		}
-	}
-	cout << "Vincoli (4) creati\n" << endl;
-
-
-	// 5. non posizionare piu' di d droni
-	double temp_d = (double)getDrnsNum();
-	sense = 'L';
-	matbeg = 0;
-	coef.clear();
-	idx.clear();
-	for (int i = 0; i < getTotalPotentialNodes() - getUsrsNum(); i++)
-	{
-		idx.push_back(y_index + i);
-		coef.push_back(1.0);
-	}
-
-	snprintf(name, NAME_SIZE, "c5_%d", rowNumber); //numerazione progressiva dei vincoli
-	char* rowname = (char*)(&name[0]);
-	rowNumber++;
-
-	CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idx.size(), &temp_d, &sense, &matbeg, &idx[0], &coef[0], NULL, &rowname);
-	idx.clear();
-	coef.clear();
-
-	cout << "Vincoli (5) creati\n" << endl;
-
-	// 6. legame tra variabili c_i_j_k e f_i_j_k
-	//REWORKED
-	sense = 'E';
-	for (int i = 0; i < getTotalPotentialNodes(); i++)
-	{
-		for (int j = 0; j < getTotalPotentialNodes(); j++)
-		{
-			//TODO: nota, se si creano solo le vars fijk tc graph[i][j]!=0, questo vincolo perde significato e non genera nuove righe
-			if (i != j && !(j < getUsrsNum() && i < getUsrsNum())) //esclude i link i cui estremi sono entrambi nodi utenti 
-			{
-				for (int k = 0; k < getCommsNum(); k++)
-				{
-					if (c[i][j][k] > getThreshold() && fMap[i][j][k] != -1) //***
-					{
-						double coef = 1.0;
-						int idx = fMap[i][j][k];
-
-						snprintf(name, NAME_SIZE, "c6_%d", rowNumber); //numerazione progressiva dei vincoli
-						char* rowname = (char*)(&name[0]);
-						rowNumber++;
-
-						CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, 1, &zero, &sense, &matbeg, &idx, &coef, NULL, &rowname);
-					}
-				}
-			}
-		}
-	}
-	cout << "Vincoli (6) creati\n" << endl;
-/*
-	sense = 'L';
-	matbeg = 0;
-	idx.clear();
-	coef.clear();
-	for (int i = 0; i < getTotalPotentialNodes(); i++)
-	{
-		for (int j = 0; j < getTotalPotentialNodes(); j++)
-		{
-			//if (i != j) ***
-			//{
-			//if (!(j < n && i < n)) //esclude i link i cui estremi sono entrambi nodi utenti //***
-			//{
-			//cout << i << " " << j << " passa" << endl;
-			for (int k = 0; k < getCommsNum(); k++)
-			{
-				if (i != j && fMap[i][j][k] != -1) //***
-				{
-
-
-					idx.push_back(fMap[i][j][k]);
-					coef.push_back(1.0);
-				}
-			}
-			// f_i_j_k - M * x_i_j
-			if(coef.size() > 0)
-			{
-				idx.push_back(xMap[i][j]);
-				coef.push_back(-bigM);
-
-				snprintf(name, NAME_SIZE, "c7_%d", rowNumber); //numerazione progressiva dei vincoli
-				char* rowname = (char*)(&name[0]);
-				rowNumber++;
-	
-				CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idx.size(), &zero, &sense, &matbeg, &idx[0], &coef[0], NULL, &rowname);
-			}
-			idx.clear();
-			coef.clear();
-		}
-	}
-	cout << "Vincoli (7) creati\n" << endl;
-*/
 	double e, reductionFactor;
 	e = exp(1);
-	reductionFactor = getRXCapacity() * (e-1) / e; //TODO: check
+	reductionFactor = getRXCapacity() * ( (2 * e) - 1) / (2 * e); //TODO: check
 	
-	// 0.9.4 version //
 
 	// 1
 	sense = 'L'; 
@@ -586,6 +373,7 @@ static void setupLP(CEnv env, Prob lp)
 		idx.clear();
 		coef.clear();
 	}	
+	cout << "Vincoli (1) creati\n" << endl;
 
 	// 1.a
 
@@ -623,7 +411,7 @@ static void setupLP(CEnv env, Prob lp)
 		idx.clear();
 		coef.clear();
 	}
-
+	cout << "Vincoli (1.a) creati\n" << endl;
 
 	// 2
 
@@ -642,7 +430,7 @@ static void setupLP(CEnv env, Prob lp)
 		idx.push_back(z_index + i);
 		coef.push_back(-reductionFactor);
 
-		snprintf(name, NAME_SIZE, "c1_%d", rowNumber); //numerazione progressiva dei vincoli
+		snprintf(name, NAME_SIZE, "c2_%d", rowNumber); //numerazione progressiva dei vincoli
 		char* rowname = (char*)(&name[0]);
 		rowNumber++;
 
@@ -651,9 +439,11 @@ static void setupLP(CEnv env, Prob lp)
 		idx.clear();
 		coef.clear();
 	}
+	cout << "Vincoli (2) creati\n" << endl;
 
 	// 3
 
+	bigM = reductionFactor; //set the big M value for each specific constraint
 	sense = 'G'; 
 	matbeg = 0;
 	coef.clear();
@@ -693,15 +483,16 @@ static void setupLP(CEnv env, Prob lp)
 		// -M(supera_i + 1 - y_i)
 
 		idx.push_back(supera_index + i);
-		coef.push_back(getBigM());
+		coef.push_back(bigM);
 
-		rhs-= getBigM();
+
+		rhs-= bigM;
 
 		idx.push_back(y_index + i - getUsrsNum());
-		coef.push_back(- getBigM());
+		coef.push_back(- bigM);
 
 
-		snprintf(name, NAME_SIZE, "c1_%d", rowNumber); //numerazione progressiva dei vincoli
+		snprintf(name, NAME_SIZE, "c3_%d", rowNumber); //numerazione progressiva dei vincoli
 		char* rowname = (char*)(&name[0]);
 		rowNumber++;
 
@@ -709,10 +500,11 @@ static void setupLP(CEnv env, Prob lp)
 		idx.clear();
 		coef.clear();
 	}
-
+	cout << "Vincoli (3) creati\n" << endl;
 
 	// 3.a
 
+	bigM = reductionFactor; //set the big M value for each specific constraint
 	sense = 'G'; 
 	matbeg = 0;
 	coef.clear();
@@ -740,9 +532,9 @@ static void setupLP(CEnv env, Prob lp)
 		// -M(supera_i)
 
 		idx.push_back(supera_index + i);
-		coef.push_back(getBigM());
+		coef.push_back(bigM);
 
-		snprintf(name, NAME_SIZE, "c1_%d", rowNumber); //numerazione progressiva dei vincoli
+		snprintf(name, NAME_SIZE, "c3_%d", rowNumber); //numerazione progressiva dei vincoli
 		char* rowname = (char*)(&name[0]);
 		rowNumber++;
 
@@ -751,9 +543,11 @@ static void setupLP(CEnv env, Prob lp)
 		idx.clear();
 		coef.clear();
 	}
+	cout << "Vincoli (3.a) creati\n" << endl;
 
 	// 4 
 
+	bigM = reductionFactor; //set the big M value for each specific constraint
 	sense = 'L'; 
 	matbeg = 0;
 	coef.clear();
@@ -790,15 +584,15 @@ static void setupLP(CEnv env, Prob lp)
 		// M(supera_i + 1 - y_i)
 
 		idx.push_back(supera_index + i);
-		coef.push_back(-getBigM());
+		coef.push_back(-bigM);
 
-		rhs+= getBigM();
+		rhs+= bigM;
 
 		idx.push_back(y_index + i - getUsrsNum());
-		coef.push_back( getBigM());
+		coef.push_back( bigM);
 
 
-		snprintf(name, NAME_SIZE, "c1_%d", rowNumber); //numerazione progressiva dei vincoli
+		snprintf(name, NAME_SIZE, "c4_%d", rowNumber); //numerazione progressiva dei vincoli
 		char* rowname = (char*)(&name[0]);
 		rowNumber++;
 
@@ -807,9 +601,11 @@ static void setupLP(CEnv env, Prob lp)
 		coef.clear();
 
 	}
+	cout << "Vincoli (4) creati\n" << endl;
 
 	// 4.a 
 
+	bigM = reductionFactor; //set the big M value for each specific constraint
 	sense = 'L'; 
 	matbeg = 0;
 	coef.clear();
@@ -836,15 +632,15 @@ static void setupLP(CEnv env, Prob lp)
 		// M(supera_i)
 
 		idx.push_back(supera_index + i);
-		coef.push_back(-getBigM());
+		coef.push_back(-bigM);
 
-		rhs+= getBigM();
+		rhs+= bigM;
 
 		idx.push_back(y_index + i);
-		coef.push_back( getBigM());
+		coef.push_back( bigM);
 
 
-		snprintf(name, NAME_SIZE, "c1_%d", rowNumber); //numerazione progressiva dei vincoli
+		snprintf(name, NAME_SIZE, "c4_%d", rowNumber); //numerazione progressiva dei vincoli
 		char* rowname = (char*)(&name[0]);
 		rowNumber++;
 
@@ -853,9 +649,11 @@ static void setupLP(CEnv env, Prob lp)
 		coef.clear();
 
 	}
+	cout << "Vincoli (4.a) creati\n" << endl;
 
 	// 5 
 
+	bigM = reductionFactor; //set the big M value for each specific constraint
 	sense = 'G'; 
 	matbeg = 0;
 	coef.clear();
@@ -874,12 +672,12 @@ static void setupLP(CEnv env, Prob lp)
 		coef.push_back(-reductionFactor);
 
 		// -M(1-y_i)
-		rhs-= getBigM();
+		rhs-= bigM;
 
 		idx.push_back(y_index + i - getUsrsNum());
 		coef.push_back(-bigM);
 
-		snprintf(name, NAME_SIZE, "c1_%d", rowNumber); //numerazione progressiva dei vincoli
+		snprintf(name, NAME_SIZE, "c5_%d", rowNumber); //numerazione progressiva dei vincoli
 		char* rowname = (char*)(&name[0]);
 		rowNumber++;
 
@@ -887,6 +685,7 @@ static void setupLP(CEnv env, Prob lp)
 		idx.clear();
 		coef.clear();
 	}
+	cout << "Vincoli (5) creati\n" << endl;
 
 	// 5.a
 
@@ -907,7 +706,7 @@ static void setupLP(CEnv env, Prob lp)
 		idx.push_back(supera_index + i);
 		coef.push_back(-reductionFactor);
 
-		snprintf(name, NAME_SIZE, "c1_%d", rowNumber); //numerazione progressiva dei vincoli
+		snprintf(name, NAME_SIZE, "c5_%d", rowNumber); //numerazione progressiva dei vincoli
 		char* rowname = (char*)(&name[0]);
 		rowNumber++;
 
@@ -915,9 +714,11 @@ static void setupLP(CEnv env, Prob lp)
 		idx.clear();
 		coef.clear();
 	}
+	cout << "Vincoli (5.a) creati\n" << endl;
 
 	// 6
 
+	bigM = getTotalPotentialNodes(); //set the big M value for each specific constraint
 	sense = 'L'; 
 	matbeg = 0;
 	coef.clear();
@@ -955,14 +756,14 @@ static void setupLP(CEnv env, Prob lp)
 				// M(z_i + 1 - y_i)
 
 				idx.push_back(z_index + i);
-				coef.push_back(-getBigM());
+				coef.push_back(-bigM);
 
-				rhs= getBigM();
+				rhs= bigM;
 
 				idx.push_back(y_index + i - getUsrsNum());
-				coef.push_back(getBigM());
+				coef.push_back(bigM);
 
-				snprintf(name, NAME_SIZE, "c1_%d", rowNumber); //numerazione progressiva dei vincoli
+				snprintf(name, NAME_SIZE, "c6_%d", rowNumber); //numerazione progressiva dei vincoli
 				char* rowname = (char*)(&name[0]);
 				rowNumber++;
 
@@ -982,7 +783,7 @@ static void setupLP(CEnv env, Prob lp)
 			idx.push_back(y_index + i - getUsrsNum());
 			coef.push_back(-1.0);
 
-			snprintf(name, NAME_SIZE, "c1_%d", rowNumber); //numerazione progressiva dei vincoli
+			snprintf(name, NAME_SIZE, "c6_%d", rowNumber); //numerazione progressiva dei vincoli
 			char* rowname = (char*)(&name[0]);
 			rowNumber++;
 
@@ -991,14 +792,18 @@ static void setupLP(CEnv env, Prob lp)
 			coef.clear();
 		}
 	}
+	cout << "Vincoli (6) creati\n" << endl;
 
-	//1.c gestione interferenza (TX)
+	//7. gestione interferenza (TX)
+
+	bigM = 10 * getTXCapacity(); //set the big M value for each specific constraint //TODO
+
 	sense = 'L';
 	matbeg = 0;
 	coef.clear();
 	idx.clear();
 
-	for(int i = 0; i < getTotalPotentialNodes(); i++)  // V'
+	for(int i = getUsrsNum(); i < getTotalPotentialNodes(); i++)  // P
 	{
 		// somma f_i_j_k (1)
 		for(int j = 0; j< getTotalPotentialNodes(); j++) // V'
@@ -1014,7 +819,7 @@ static void setupLP(CEnv env, Prob lp)
 		}
 
 		// somma fattori interferenza posizioni per P (2)
-		for(int v = getUsrsNum(); v < getTotalPotentialNodes(); v++)
+		for(int v = getUsrsNum(); v < getTotalPotentialNodes(); v++)  // P
 		{
 			if(i != v && getDistance(mapGrid[i].x, mapGrid[i].y, mapGrid[v].x, mapGrid[v].y) <= getNodeRadius())
 			{
@@ -1025,7 +830,7 @@ static void setupLP(CEnv env, Prob lp)
 
 		// somma fattori interferenza utenti per V (3)
 		double rhs = 0;
-		for(int v = 0; v < getUsrsNum(); v++)
+		for(int v = 0; v < getUsrsNum(); v++)  //  V
 		{
 			if(i != v && getDistance(mapGrid[i].x, mapGrid[i].y, mapGrid[v].x, mapGrid[v].y) <= getNodeRadius())
 			{
@@ -1033,9 +838,12 @@ static void setupLP(CEnv env, Prob lp)
 			}
 		}
 
-		rhs = getTXCapacity() - rhs; 
+		rhs= bigM - rhs;
+		idx.push_back( y_index + i - getUsrsNum() );
+		coef.push_back( bigM -getTXCapacity() );
+		//rhs = getTXCapacity() - rhs; 
 
-		snprintf(name, NAME_SIZE, "c1_%d", rowNumber); //numerazione progressiva dei vincoli
+		snprintf(name, NAME_SIZE, "c7_%d", rowNumber); //numerazione progressiva dei vincoli
 		char* rowname = (char*)(&name[0]);
 		rowNumber++;
 
@@ -1043,6 +851,264 @@ static void setupLP(CEnv env, Prob lp)
 		idx.clear();
 		coef.clear();
 	}
+	cout << "Vincoli (7) creati\n" << endl;
+
+	//7.a
+
+	sense = 'L';
+	matbeg = 0;
+	coef.clear();
+	idx.clear();
+
+	for(int i = 0; i < getUsrsNum(); i++)  // V
+	{
+		// somma f_i_j_k (1)
+		for(int j = getUsrsNum(); j< getTotalPotentialNodes(); j++) // P
+		{
+			for(int k = 0; k < getCommsNum(); k++)
+			{
+				if (i != j && fMap[i][j][k] != -1)
+				{
+					idx.push_back(fMap[i][j][k]);
+					coef.push_back(1.0);
+				}
+			}
+		}
+
+		// somma fattori interferenza posizioni per P (2)
+		for(int v = getUsrsNum(); v < getTotalPotentialNodes(); v++)  // P
+		{
+			if(i != v && getDistance(mapGrid[i].x, mapGrid[i].y, mapGrid[v].x, mapGrid[v].y) <= getNodeRadius())
+			{
+				idx.push_back(y_index + v - getUsrsNum());
+				coef.push_back(getInterferenceFactor(i,v));
+			}
+		}
+
+		// termine noto
+		double rhs = getTXCapacity();
+
+		snprintf(name, NAME_SIZE, "c7_%d", rowNumber); //numerazione progressiva dei vincoli
+		char* rowname = (char*)(&name[0]);
+		rowNumber++;
+
+		CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idx.size(), &rhs, &sense, &matbeg, &idx[0], &coef[0], NULL, &rowname);
+		idx.clear();
+		coef.clear();
+	}
+	cout << "Vincoli (7.a) creati\n" << endl;
+
+	// 8. conservazione flusso
+	sense = 'E';
+	matbeg = 0;
+	coef.clear();
+	idx.clear();
+	for (int v = 0; v < getTotalPotentialNodes(); v++)
+	{
+		for (int k = 0; k < getCommsNum(); k++)
+		{
+			for (int i = 0; i < getTotalPotentialNodes(); i++)
+			{
+				//if (i != v && graph[i][v] != 0)
+				//if (i != v && !(v < n && i < n)) //condizione più generale, include le fijk di nodi tra cui non ci sono link
+				if (i != v && fMap[i][v][k] != -1) //*** a meno della presenza di nodi isolati, ci sarà per ogni vincolo almeno una coppia di f tc fmap[][][]!=-1
+				{
+					idx.push_back(fMap[i][v][k]);
+					coef.push_back(1.0);
+				}
+			}
+
+			for (int j = 0; j < getTotalPotentialNodes(); j++)
+			{
+				//if (v != j && graph[v][j] != 0)
+				if (v != j && fMap[v][j][k] != -1) //***condizione più generale, include le fijv di nodi tra cui non ci sono link
+				{
+					idx.push_back(fMap[v][j][k]);
+					coef.push_back(-1.0);
+				}
+			}
+
+			snprintf(name, NAME_SIZE, "c8_%d", rowNumber); //numerazione progressiva dei vincoli
+			char* rowname = (char*)(&name[0]);
+			rowNumber++;
+
+
+			CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idx.size(), &b[v][k], &sense, &matbeg, &idx[0], &coef[0], NULL, &rowname);
+			idx.clear();
+			coef.clear();
+
+		}
+	}
+	cout << "Vincoli (8) creati\n" << endl;
+
+	// 9. legame tra variabili x_i_j e y_j
+	sense = 'L';
+	matbeg = 0;
+	coef.clear();
+	idx.clear();
+	for (int j = getUsrsNum(); j < getTotalPotentialNodes(); j++)
+	{
+		for (int i = 0; i < getTotalPotentialNodes(); i++)
+		{
+			//if (i != j && graph[i][j] != 0)
+			//if (i != j && xMap[i][j] != -1) //***
+			if (i != j && xMap[i][j] != -1 && xMap[j][i] != -1) //***
+			{
+				//add x_i_j
+				idx.push_back(xMap[i][j]);
+				coef.push_back(1.0);
+
+				//add -y_j
+				idx.push_back(y_index + (j - getUsrsNum()));
+				coef.push_back(-1.0);
+
+				snprintf(name, NAME_SIZE, "c9_%d", rowNumber); //numerazione progressiva dei vincoli
+				char* rowname = (char*)(&name[0]);
+				rowNumber++;
+
+				CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idx.size(), &zero, &sense, &matbeg, &idx[0], &coef[0], NULL, &rowname);
+
+				//add x_j_i
+				idx[0] = xMap[j][i];
+				
+
+				snprintf(name, NAME_SIZE, "c9_%d", rowNumber); //numerazione progressiva dei vincoli
+				rowname = (char*)(&name[0]);
+				rowNumber++;
+
+				CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idx.size(), &zero, &sense, &matbeg, &idx[0], &coef[0], NULL, &rowname);
+				idx.clear();
+				coef.clear();
+			}
+		}
+	}
+
+	cout << "Vincoli (9) creati\n" << endl;
+
+	// 10. un drone non puo' mantenere piu' di s potenziali connessioni simultanee
+	sense = 'L';
+	matbeg = 0;
+	coef.clear();
+	idx.clear();
+	for (int v = getUsrsNum(); v < getTotalPotentialNodes(); v++)
+	{
+		double temp_s = (double)getMaxConnections();
+		for (int i = 0; i < getTotalPotentialNodes(); i++)
+		{
+			//if (i != v)
+			if (xMap[i][v] != -1) //***
+			{
+				idx.push_back(xMap[i][v]);
+				coef.push_back(1.0);
+			}
+		}
+
+		if (idx.size() > 0) //***
+		{
+
+			snprintf(name, NAME_SIZE, "c10_%d", rowNumber); //numerazione progressiva dei vincoli
+			char* rowname = (char*)(&name[0]);
+			rowNumber++;
+
+			CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idx.size(), &temp_s, &sense, &matbeg, &idx[0], &coef[0], NULL, &rowname);
+			idx.clear();
+			coef.clear();
+		}
+	}
+	cout << "Vincoli (10) creati\n" << endl;
+
+
+	// 11. non posizionare piu' di d droni
+	double temp_d = (double)getDrnsNum();
+	sense = 'L';
+	matbeg = 0;
+	coef.clear();
+	idx.clear();
+	for (int i = 0; i < getTotalPotentialNodes() - getUsrsNum(); i++)
+	{
+		idx.push_back(y_index + i);
+		coef.push_back(1.0);
+	}
+
+	snprintf(name, NAME_SIZE, "c11_%d", rowNumber); //numerazione progressiva dei vincoli
+	char* rowname = (char*)(&name[0]);
+	rowNumber++;
+
+	CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idx.size(), &temp_d, &sense, &matbeg, &idx[0], &coef[0], NULL, &rowname);
+	idx.clear();
+	coef.clear();
+
+	cout << "Vincoli (11) creati\n" << endl;
+
+	// 6. legame tra variabili c_i_j_k e f_i_j_k
+	//REWORKED
+	sense = 'E';
+	for (int i = 0; i < getTotalPotentialNodes(); i++)
+	{
+		for (int j = 0; j < getTotalPotentialNodes(); j++)
+		{
+			//TODO: nota, se si creano solo le vars fijk tc graph[i][j]!=0, questo vincolo perde significato e non genera nuove righe
+			if (i != j && !(j < getUsrsNum() && i < getUsrsNum())) //esclude i link i cui estremi sono entrambi nodi utenti 
+			{
+				for (int k = 0; k < getCommsNum(); k++)
+				{
+					if (c[i][j][k] > getThreshold() && fMap[i][j][k] != -1) //***
+					{
+						double coef = 1.0;
+						int idx = fMap[i][j][k];
+
+						snprintf(name, NAME_SIZE, "c6a_%d", rowNumber); //numerazione progressiva dei vincoli
+						char* rowname = (char*)(&name[0]);
+						rowNumber++;
+
+						CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, 1, &zero, &sense, &matbeg, &idx, &coef, NULL, &rowname);
+					}
+				}
+			}
+		}
+	}
+	cout << "Vincoli (6) creati\n" << endl;
+
+	// 12. Legame tra le variabili f_i_j_k e x_i_j
+
+	bigM = max(getRXCapacity(),getTXCapacity()); //set the big M value for each specific constraint
+	sense = 'L';
+	matbeg = 0;
+	idx.clear();
+	coef.clear();
+	for (int i = 0; i < getTotalPotentialNodes(); i++)
+	{
+		for (int j = 0; j < getTotalPotentialNodes(); j++)
+		{
+			//if (i != j) ***
+			//{
+			//if (!(j < n && i < n)) //esclude i link i cui estremi sono entrambi nodi utenti //***
+			//{
+			for (int k = 0; k < getCommsNum(); k++)
+			{
+				if (i != j && fMap[i][j][k] != -1) //***
+				{
+					idx.push_back(fMap[i][j][k]);
+					coef.push_back(1.0);
+				}
+			}
+			// f_i_j_k - M * x_i_j
+			if(coef.size() > 0)
+			{
+				idx.push_back(xMap[i][j]);
+				coef.push_back(-bigM);
+
+				snprintf(name, NAME_SIZE, "c12_%d", rowNumber); //numerazione progressiva dei vincoli
+				char* rowname = (char*)(&name[0]);
+				rowNumber++;
+	
+				CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idx.size(), &zero, &sense, &matbeg, &idx[0], &coef[0], NULL, &rowname);
+			}
+			idx.clear();
+			coef.clear();
+		}
+	}
+	cout << "Vincoli (12) creati\n" << endl;
 }
 
 
