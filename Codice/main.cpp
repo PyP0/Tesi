@@ -48,7 +48,7 @@ vector< string > loadFileList(string masterFile)
 	}
 }
 
-solution_t *executeInstance(string fileName, bool verbose)
+solution_t *executeInstance(string fileName, bool verbose, int contRelax[])
 {
 	solution_t *instSolution = NULL;
 	
@@ -86,7 +86,7 @@ solution_t *executeInstance(string fileName, bool verbose)
 
 		try
 		{
-			instSolution = solveLP(env, lp, instance, verbose);
+			instSolution = solveLP(env, lp, instance, verbose, contRelax);
 			if(instSolution != NULL)
 			{
 				cout << "Status code: " << instSolution->statusCode << endl;
@@ -137,7 +137,7 @@ solution_t *executeInstance(string fileName, bool verbose)
 
 }
 
-int executeMaster(vector< string > fileList, string masterSolutionsFile, bool verbose)
+int executeMaster(vector< string > fileList, string masterSolutionsFile, bool verbose, int contRelax[])
 {
 	int globalStatus = 0;
 	solution_t *instSolution = NULL;
@@ -153,7 +153,7 @@ int executeMaster(vector< string > fileList, string masterSolutionsFile, bool ve
 
 		for(unsigned int i = 0; i < fileList.size(); i++)
 		{
-			instSolution = executeInstance(fileList[i],verbose);
+			instSolution = executeInstance(fileList[i],verbose,contRelax);
 			if(instSolution == NULL)  //check solution status
 				globalStatus = 1;
 			else
@@ -199,7 +199,7 @@ int main(int argc, char const *argv[])
 	
 	bool verbose = false;
 	//srand(time(NULL)); /* seed random number generator */
-
+	int contRelax[] = {1,1,1,1,1};
 	
 	//string baseFileName;
 	if(argc < 1)
@@ -244,18 +244,18 @@ int main(int argc, char const *argv[])
 				string pathToMasterSolFile(argv[2]);
 				pathToMasterSolFile = pathToMasterSolFile + MASTER_SOLUTIONS_FILE;
 				
-				return executeMaster(loadFileList(pathToMaster.c_str()), pathToMasterSolFile.c_str(), verbose);
+				return executeMaster(loadFileList(pathToMaster.c_str()), pathToMasterSolFile.c_str(), verbose, contRelax);
 			}
 			else
 			{
-				int status = executeMaster(loadFileList(MASTER_FILE), MASTER_SOLUTIONS_FILE, verbose);
+				int status = executeMaster(loadFileList(MASTER_FILE), MASTER_SOLUTIONS_FILE, verbose, contRelax);
 				return status;
 			}
 		}
 		else
 		{
 			//arg 2: file istanza
-			solution_t *instSolution = executeInstance(string(argv[1]),true);
+			solution_t *instSolution = executeInstance(string(argv[1]),true,contRelax);
 			if(instSolution == NULL)
 				return 1;
 			else

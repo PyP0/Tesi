@@ -22,7 +22,7 @@ void printVarsValue(CEnv, Prob);
 //solution_t *getSolution(CEnv, Prob);
 void printSolution(solution_t*);
 void printConflictFile(std::string,CEnv,Prob);
-solution_t *solveLP(CEnv,Prob,std::string,bool); 
+solution_t *solveLP(CEnv,Prob,std::string,bool,int*); 
 //void printNetworkUsage(CEnv,Prob);
 void printSimplifiedSolFile(CEnv,Prob,const char*);
 int testSolutionFile(const char *,const char *);

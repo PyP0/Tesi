@@ -129,7 +129,7 @@ static bool areOutOfSight(int i, int j)
 	return flag;
 }
 
-static void setupLP(CEnv env, Prob lp)
+static void setupLP(CEnv env, Prob lp, int contRelax[])
 {
 
 	const double zero = 0.0;
@@ -160,7 +160,13 @@ static void setupLP(CEnv env, Prob lp)
 				if (i != j && (c[i][j][k] <= getThreshold()) && !(i < getUsrsNum() && j < getUsrsNum())) //***
 				//if (i != j && (c[i][j][k] <= threshold ) && !(i < n && j < n)) //*** TODO: senza le uij, va rivisto
 				{
-					char ftype = 'I'; //I***
+					
+					char ftype; 
+					if(contRelax[0] == 0) //rilassamento continuo?
+						ftype = 'I';
+					else
+						ftype = 'C'; 
+
 					double lb = 0.0;
 					double ub = CPX_INFBOUND;
 
@@ -185,7 +191,12 @@ static void setupLP(CEnv env, Prob lp)
 
 	for (int i = 0; i < getPosNum() - getUsrsNum(); i++)
 	{
-		char ytype = 'B';
+		char ytype; 
+		if(contRelax[1] == 0) //rilassamento continuo?
+			ytype = 'B';
+		else
+			ytype = 'C'; 
+		
 		double lb = 0.0;
 		double ub = 1.0;
 
@@ -213,7 +224,12 @@ static void setupLP(CEnv env, Prob lp)
 			if (!areOutOfSight(i, j)) //***
 			//if (!areOutOfSight(i, j)) //***
 			{
-				char xtype = 'B'; 
+				char xtype; 
+				if(contRelax[2] == 0) //rilassamento continuo?
+					xtype = 'B';
+				else
+					xtype = 'C'; 
+
 				double lb = 0.0;
 				double ub = 1.0;
 
@@ -236,9 +252,14 @@ static void setupLP(CEnv env, Prob lp)
 			//esclude le variabili x_i_j con i==j
 			//if(i!=j)
 			if (i != j && (!areOutOfSight(i, j) )) //***
-															   //if (i != j && (!areOutOfSight(i, j))) //***
+			//if (i != j && (!areOutOfSight(i, j))) //***
 			{
-				char xtype = 'B'; 
+				char xtype; 
+				if(contRelax[2] == 0) //rilassamento continuo?
+					xtype = 'B';
+				else
+					xtype = 'C';
+
 				double lb = 0.0;
 				double ub = 1.0;
 
@@ -261,7 +282,12 @@ static void setupLP(CEnv env, Prob lp)
 	//int zMapIndex = z_index;
 	for (int i = 0; i < getTotalPotentialNodes(); i++)
 	{
-		char ztype = 'B';  
+		char ztype; 
+		if(contRelax[3] == 0) //rilassamento continuo?
+			ztype = 'B';
+		else
+			ztype = 'C'; 
+
 		double lb = 0.0;
 		double ub = 1.0;
 		
@@ -282,10 +308,10 @@ static void setupLP(CEnv env, Prob lp)
 
 	//aggiunta variabili s_i
 	int s_index = CPXgetnumcols(env, lp);
-	//int zMapIndex = z_index;
 	for (int i = 0; i < getTotalPotentialNodes(); i++)
 	{
 		char stype = 'C'; 
+
 		double lb = -CPX_INFBOUND; //TODO: check
 		double ub = CPX_INFBOUND;
 		
@@ -300,20 +326,25 @@ static void setupLP(CEnv env, Prob lp)
 
 	//aggiunta variabili supera_i
 	int supera_index = CPXgetnumcols(env, lp);
-	//int zMapIndex = z_index;
 	for (int i = 0; i < getTotalPotentialNodes(); i++)
-	{
-		char stype = 'B';  
+	{  
+		char sptype; 
+		if(contRelax[4] == 0) //rilassamento continuo?
+			sptype = 'B';
+		else
+			sptype = 'C'; 
+		
 		double lb = 0.0; 
 		double ub = 1.0;
 		
 		snprintf(name, NAME_SIZE, "sp_%d", i); //scrive il nome della variabile s_i sulla stringa name[]
 		char* sname = (char*)(&name[0]);
 		
-		CHECKED_CPX_CALL(CPXnewcols, env, lp, 1, &zero, &lb, &ub, &stype, &sname);   //costruisce la singola variabile 
+		CHECKED_CPX_CALL(CPXnewcols, env, lp, 1, &zero, &lb, &ub, &sptype, &sname);   //costruisce la singola variabile 
 	}
 
 	cout << "Sono state create " << CPXgetnumcols(env, lp) - supera_index << " variabili sp_i" << endl;  //numero totale delle vars create
+
 
 	//=========================================================================
 	//=========================================================================
@@ -1203,7 +1234,7 @@ void printSolution(solution_t *solution)
 	}
 }
 
-solution_t *solveLP(CEnv env, Prob lp, string baseFileName, bool verbose)
+solution_t *solveLP(CEnv env, Prob lp, string baseFileName, bool verbose, int contRelax[])
 {
 
 	string lpFile = baseFileName + ".lp";
@@ -1211,7 +1242,7 @@ solution_t *solveLP(CEnv env, Prob lp, string baseFileName, bool verbose)
 	std::chrono::high_resolution_clock::time_point start, end;
 	solution_t *solution = NULL;
 	// setup LP
-	setupLP(env, lp);
+	setupLP(env, lp, contRelax);
 	
 	if(verbose == true)	
 		CHECKED_CPX_CALL(CPXwriteprob, env, lp, lpFile.c_str(), NULL);
