@@ -621,7 +621,7 @@ int saveInstance(const char *filename)
 			{
 				for (unsigned int j = 0; j < c[0].size(); j++)
 				{
-					int counter = 0;
+					unsigned int counter = 0;
 					for (unsigned int k = 0; k < c[0][0].size(); k++)
 					{
 						if(c[i][j][k] >= threshold)
@@ -664,7 +664,7 @@ int saveInstance(const char *filename)
 
 }
 
-int loadInstance(const char *filename) //TODO: controlli su possibile istanza corrotta (getline)
+int loadInstance(const char *filename)
 {
 	int result = 0;
 	ifstream file;

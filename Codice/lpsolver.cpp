@@ -24,7 +24,7 @@ int x_index = 0;
 int w_index = 0;
 int z_index = 0;
 
-int bigM = 100000; // TODO: bigM deve essere maggiore della capacità massima dei link
+int bigM = 1000000; //default value
 
 
 
@@ -158,7 +158,6 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 
 				//if (i != j) //c'è un arco tra i nodi i e j, quindi creo la corrispondente variabile di flusso fijk
 				if (i != j && (c[i][j][k] <= getThreshold()) && !(i < getUsrsNum() && j < getUsrsNum())) //***
-				//if (i != j && (c[i][j][k] <= threshold ) && !(i < n && j < n)) //*** TODO: senza le uij, va rivisto
 				{
 					
 					char ftype; 
@@ -312,7 +311,7 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 	{
 		char stype = 'C'; 
 
-		double lb = -CPX_INFBOUND; //TODO: check
+		double lb = -CPX_INFBOUND;
 		double ub = CPX_INFBOUND;
 		
 		snprintf(name, NAME_SIZE, "s_%d", i); //scrive il nome della variabile s_i sulla stringa name[]
@@ -365,7 +364,7 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 
 	double e, reductionFactor;
 	e = exp(1);
-	reductionFactor = getRXCapacity() * ( (2 * e) - 1) / (2 * e); //TODO: check
+	reductionFactor = getRXCapacity() * ( (2 * e) - 1) / (2 * e);
 	
 
 	// 1
@@ -1071,14 +1070,12 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 
 	cout << "Vincoli (11) creati\n" << endl;
 
-	// 6. legame tra variabili c_i_j_k e f_i_j_k
-	//REWORKED
+	// 6. legame tra variabili c_i_j_k e f_i_j_k //TODO: rimuovere
 	sense = 'E';
 	for (int i = 0; i < getTotalPotentialNodes(); i++)
 	{
 		for (int j = 0; j < getTotalPotentialNodes(); j++)
 		{
-			//TODO: nota, se si creano solo le vars fijk tc graph[i][j]!=0, questo vincolo perde significato e non genera nuove righe
 			if (i != j && !(j < getUsrsNum() && i < getUsrsNum())) //esclude i link i cui estremi sono entrambi nodi utenti 
 			{
 				for (int k = 0; k < getCommsNum(); k++)
@@ -1302,7 +1299,7 @@ solution_t *solveLP(CEnv env, Prob lp, string baseFileName, bool verbose, int co
 	}
 
 	interfaceToGraphicModule(env, lp, string(baseFileName +".buf.txt").c_str());
-	//printDOTGraph(string(baseFileName+".dot")); //TODO: togli
+	
 	if(verbose == true)	
 		printSimplifiedSolFile(env, lp, string(baseFileName + ".var.txt").c_str());
 	return solution;
@@ -1553,32 +1550,4 @@ void printSimplifiedSolFile(CEnv env, Prob lp, const char* solution)
 		cerr << __FUNCTION__ << " An exception has occurred: " << e.what() << endl;
 	}
 }
-
-/*
-void printNetworkUsage(CEnv env, Prob lp) //TODO: una volta eliminati gli u, bisogna riadattarla con Utx/Urx
-{
-	vector< vector< vector<int> > > flow(getTotalPotentialNodes(), vector< vector<int> >(getTotalPotentialNodes(), vector<int>(getCommsNum(), -1)));
-	getSolutionFlowMatrix(env, lp, flow);
-	if (flow.size() > 0)
-	{
-		for (unsigned int i = 0; i < flow.size(); i++)
-		{
-			for (unsigned int j = 0; j < flow[0].size(); j++)
-			{
-				int acc = 0;
-				for (unsigned int k = 0; k < flow[0][0].size(); k++)
-				{
-					if (flow[i][j][k]>0)
-						acc += flow[i][j][k];
-				}
-				if (acc > 0)
-					cout << "Flusso sul link (" << i << "," << j << "): " << acc << "/" << u[i][j] << endl;
-			}
-		}
-	}
-	else
-	{
-		cerr << __FUNCTION__ << "(): Strutture dati non allocate." << endl;
-	}
-}*/
 

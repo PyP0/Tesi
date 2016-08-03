@@ -15,9 +15,12 @@
 
 using namespace std;
 
-void printHelper() //TODO
+void printHelper()
 {
-	cout << endl << "Helper to do" <<endl;
+	cout << endl << "Program usage: " <<endl;
+	cout <<"ProgramName \t Generates instances. " <<endl; //TODO
+	cout <<"ProgramName -a [PATH] \t Executes every instance found into [PATH] or default DIR (if PATH not provided)." <<endl; //TODO
+	cout <<"ProgramName [INSTANCE_NAME] \t Execute the specific instance." << endl << endl; //TODO 
 }
 
 vector< string > loadFileList(string masterFile)
