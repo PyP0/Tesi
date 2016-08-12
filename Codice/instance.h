@@ -7,7 +7,7 @@
 #include <map>
 
 #define DISCONNECTED_COST CPX_INFBOUND
-#define INSTANCE_PATH "../instanc3es/"
+#define INSTANCE_PATH "../instances/"
 #define MASTER_FILE "master.txt"
 
 //test coordinate discrete su griglia

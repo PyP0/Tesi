@@ -570,7 +570,7 @@ int createBatchInstances(int instQuantity, vector<int> users, vector<int> drones
 		}
 		else
 		{
-			cerr << __FUNCTION__ << "(): Impossibile aprire il file: " << file << endl;
+			cerr << __FUNCTION__ << "(): Impossibile aprire il file: " << fileName << endl;
 			return 1;
 		}
 	}

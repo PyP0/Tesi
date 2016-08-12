@@ -60,7 +60,7 @@ solution_t *executeInstance(string fileName, bool verbose, int contRelax[])
 	DECL_ENV(env);
 	DECL_PROB(env, lp);
 	
-	if(CPXsetintparam(env, CPX_PARAM_CONFLICTDISPLAY, 2) != 0 || CPXsetdblparam(env,CPX_PARAM_TILIM, 1800.0) != 0) //10 minutes stop 
+	if(CPXsetintparam(env, CPX_PARAM_CONFLICTDISPLAY, 2) != 0) 
 		cerr << __FUNCTION__ << "(): Impossibile settare uno o piu' parametri di CPLEX." << endl;
 	
 	string baseFileName (fileName);
@@ -171,7 +171,7 @@ int executeMaster(vector< string > fileList, string masterSolutionsFile, bool ve
 							dronesCount++;
 						}
 					}
-					//remove the ../instances/
+					//remove the ../instances/ //TODO: fixare
 					file << instSolution->instName.substr(13,string::npos) << "\t";
 					file << instSolution->objValue << "\t";
 					file << instSolution->execTime << "\t";
@@ -202,24 +202,19 @@ int main(int argc, char const *argv[])
 	
 	bool verbose = false;
 	//srand(time(NULL)); /* seed random number generator */
-	int contRelax[] = {1,1,1,1,1};
-	
+	int contRelax[] = {0,0,0,0,0};
+	int typeOfLPVariables = 5;
 	//string baseFileName;
-	if(argc < 1)
-	{
-		printHelper();
-		return 0;
-	}
 	if(argc == 1)
 	{
 		//int instQuantity, vector<int> users, vector<int> drones, vector<int> gridLength, vector<int> gridHeight, vector<int> gridStep, int tInf, int tSup, double cInf, double cSup, double dInf, double dSup, string instRootName)
 		createBatchInstances(
-			10, //instQuantity
+			5, //instQuantity
 			vector<int> {5}, //users
 			vector<int> {20}, //drones
-			vector<int> {4,10,10,15,20}, //gridLength
-			vector<int> {5,5,10,10,10},  //gridHeight
-			vector<int> {2,2,2,2,2},  //gridStep
+			vector<int> {4,10,10,15,20,50}, //gridLength
+			vector<int> {5,5,10,10,10,10},  //gridHeight
+			vector<int> {2,2,2,2,2,2},  //gridStep
 			0, 	//tInf
 			30, //tSup
 			5,	//cInf
@@ -230,12 +225,117 @@ int main(int argc, char const *argv[])
 	}
 	else
 	{
-		/*solution_t *instSolution=NULL;
-	
-		// init
-		DECL_ENV(env);
-		DECL_PROB(env, lp);
-		CPXsetintparam(env, CPX_PARAM_CONFLICTDISPLAY, 2);*/
+		if(string(argv[1]).compare(string("-h")) == 0)
+		{
+			printHelper();
+			return 0;
+		}
+		
+		if(argc == 3 && string(argv[1]).compare(string("-r")) == 0)
+		{
+			string pathToMaster(argv[2]);
+			pathToMaster = pathToMaster + MASTER_FILE;
+
+			//string pathToMasterSolFile(argv[2]);
+			//pathToMasterSolFile = pathToMasterSolFile + MASTER_SOLUTIONS_FILE;
+			vector< string > listOfInstance = loadFileList(pathToMaster.c_str()); 
+			if (listOfInstance.size() > 0)
+			{
+				string csvCumulativeFile = pathToMaster + ".csv";
+				ofstream csvFile;
+					
+				csvFile.open(csvCumulativeFile, ios::out);
+				if(csvFile.is_open())
+				{
+					for(unsigned int i = 0; i < listOfInstance.size(); i++)
+					{
+						string relaxedFile = listOfInstance[i] + ".relsol";
+						ofstream relFile;
+						int count[1];
+						
+						relFile.open(relaxedFile,ios::out);
+						
+						if(relFile.is_open())
+						{
+							relFile << relaxedFile << endl;
+							csvFile << listOfInstance[i] << '\t';							
+							for(int j = 0; j < (int) pow(2.0,double(typeOfLPVariables)); j++) 
+							{
+								if( (j & 16) != 16)
+									relFile << "f" << '\t';
+								else
+									relFile << "rel_f" << '\t';
+								
+								if( (j & 8) != 8)
+									relFile << "y" << '\t';
+								else
+									relFile << "rel_y" << '\t';
+								
+								if( (j & 4) != 4)
+									relFile << "x" << '\t';
+								else
+									relFile << "rel_x" << '\t';
+								
+								if( (j & 2) != 2)
+									relFile << "z" << '\t';
+								else
+									relFile << "rel_z" << '\t';
+								
+								if( (j & 1) != 1)
+									relFile << "sp" << '\t';
+								else
+									relFile << "rel_sp" << '\t';
+								
+								relFile << endl;
+								
+								count[0] = j;
+								solution_t *instSolution = executeInstance(listOfInstance[i],false,count);
+								if(instSolution != NULL)
+								{
+									int dronesCount = 0;
+									
+									relFile << instSolution->objValue << '\t';
+									relFile << instSolution->execTime << '\t';
+									relFile << instSolution->statusCode << '\t';
+									
+									csvFile << instSolution->objValue << '\t';
+									csvFile << instSolution->execTime << '\t';
+									csvFile << instSolution->statusCode << '\t';
+									
+									for(unsigned int l = 0; l < instSolution->yPositions.size(); l++)
+									{
+										if (round(instSolution->yPositions[l]) == 1)
+										{
+											dronesCount++;
+										}
+									}
+									relFile <<  dronesCount << "/" << getDrnsNum() << '\t';
+									csvFile <<  dronesCount << "/" << getDrnsNum() << '\t';
+									
+									delete instSolution;
+									relFile << endl << endl;
+								}		
+							}
+							csvFile << endl;
+							relFile.close();
+						}
+						else
+						{
+							cerr << __FUNCTION__ << "(): Impossibile creare il file: " << relaxedFile << endl;
+							return 1;
+						}
+					}
+				}
+				else
+					cerr << __FUNCTION__ << "(): Impossibile creare il file: " << csvCumulativeFile << endl;
+				return 0;
+			}
+			else
+			{
+				cerr << __FUNCTION__ << "(): Nessuna istanza presente nel file: " << pathToMaster << endl;
+				return 1;
+			}
+		}
 
 		if(string(argv[1]).compare(string("-a")) == 0)
 		{
@@ -267,73 +367,6 @@ int main(int argc, char const *argv[])
 				return 0;
 			}
 		}
-		//arg 2: file istanza
-		/*string baseFileName (argv[1]);
-		string instance = baseFileName;
-		string lpFile = baseFileName + ".lp";
-		string solution = baseFileName + ".txt";
-		string solFile = baseFileName + ".sol";
-		string clpFile = baseFileName + ".clp";
-
-		
-		//createRandomInstance(users,drones,positions,tInf,tSup,cInf,cSup,dInf,dSup,gridLength,gridHeight,gridStep,filename);
-		//createRandomInstance(5,6,6, 0,20, 1,150, 50,60, 2,3,10,"randomTest");
-		if (loadInstance(instance.c_str()) != 0)
-		{
-			cerr << __FUNCTION__ <<" Impossibile caricare l'istanza: " << instance << endl;
-		}
-		else
-		{
-			cout << "Instance " << instance << " loaded." << endl;
-			cout << "Users: " << getUsrsNum() << endl;
-			cout << "Drones: " << getDrnsNum() << endl;
-			cout << "Potential drones positions: " << getPosNum() << endl << endl;
-			
-
-			//saveInstance(instance.c_str());
-			printNodesIOFlow();
-			try
-			{
-				int status = solveLP(env, lp, lpFile);
-				cout << "Status code: " << status << endl;
-
-				if (status == 103) //CPXMIP_INFEASIBLE 
-				{
-					// infeasibility detected
-					printConflictFile(clpFile, env, lp);
-				}
-				else
-				{
-					//printSolutionData(env, lp, y_index, solution);
-					instSolution = getSolution(env, lp);
-					if (instSolution == NULL)
-						cerr << __FUNCTION__ << "(): Impossibile salvare la soluzione dell'istanza risolta." << endl;
-					else
-						printSolution(instSolution);
-					
-					printSimplifiedSolFile(env, lp, solution.c_str());
-					printVarsValue(env, lp);
-					//printNetworkUsage(env, lp);
-					//testSolutionFile("refIST3.txt", solution.c_str());
-
-					CHECKED_CPX_CALL(CPXsolwrite, env, lp, solFile.c_str());
-				}
-
-				// free
-				CPXfreeprob(env, &lp);
-				CPXcloseCPLEX(&env);
-				if (instSolution != NULL)
-				{
-					delete[] instSolution->yPositions;
-					delete instSolution;
-				}
-			}
-			catch (exception& e)
-			{
-				cerr << __FUNCTION__ << "(): An exception has occurred: " << e.what() << endl;
-			}
-		}
-		return 0;*/
 		
 	}
 }

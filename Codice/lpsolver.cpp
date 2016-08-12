@@ -149,6 +149,16 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 	//aggiunta delle variabili f_i_j_k, una per volta, con i!=j
 	//nota: la variabile f_i_j_k e' distinta dalla variabile f_j_i_k
 	int fMapIndex = 0;
+	char ftype; 
+	
+	if( (contRelax[0] & 16) != 16) //rilassamento continuo?
+		ftype = 'I';
+	else
+	{
+		ftype = 'C'; 
+		cout << "Rilassamento continuo su variabili f_i_j_k" << endl;
+	}
+	
 	for (int k = 0; k < getCommsNum(); k++)
 	{
 		for (int i = 0; i < getTotalPotentialNodes(); i++)
@@ -158,14 +168,7 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 
 				//if (i != j) //c'è un arco tra i nodi i e j, quindi creo la corrispondente variabile di flusso fijk
 				if (i != j && (c[i][j][k] <= getThreshold()) && !(i < getUsrsNum() && j < getUsrsNum())) //***
-				{
-					
-					char ftype; 
-					if(contRelax[0] == 0) //rilassamento continuo?
-						ftype = 'I';
-					else
-						ftype = 'C'; 
-
+				{		
 					double lb = 0.0;
 					double ub = CPX_INFBOUND;
 
@@ -191,10 +194,14 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 	for (int i = 0; i < getPosNum() - getUsrsNum(); i++)
 	{
 		char ytype; 
-		if(contRelax[1] == 0) //rilassamento continuo?
+		if( (contRelax[0] & 8) != 8) //rilassamento continuo?
 			ytype = 'B';
 		else
+		{
 			ytype = 'C'; 
+			if( i == 0) //debug
+				cout << "Rilassamento continuo su variabili y_i" << endl;
+		}
 		
 		double lb = 0.0;
 		double ub = 1.0;
@@ -224,11 +231,14 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 			//if (!areOutOfSight(i, j)) //***
 			{
 				char xtype; 
-				if(contRelax[2] == 0) //rilassamento continuo?
+				if( (contRelax[0] & 4) != 4) //rilassamento continuo?
 					xtype = 'B';
 				else
+				{
 					xtype = 'C'; 
-
+					if( i == 0) //debug
+						cout << "Rilassamento continuo su variabili x_i_j" << endl;
+				}
 				double lb = 0.0;
 				double ub = 1.0;
 
@@ -254,11 +264,14 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 			//if (i != j && (!areOutOfSight(i, j))) //***
 			{
 				char xtype; 
-				if(contRelax[2] == 0) //rilassamento continuo?
+				if( (contRelax[0] & 4) != 4) //rilassamento continuo?
 					xtype = 'B';
 				else
+				{
 					xtype = 'C';
-
+					if( i == 0) //debug
+						cout << "Rilassamento continuo su variabili x_i_j" << endl;
+				}
 				double lb = 0.0;
 				double ub = 1.0;
 
@@ -282,10 +295,14 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 	for (int i = 0; i < getTotalPotentialNodes(); i++)
 	{
 		char ztype; 
-		if(contRelax[3] == 0) //rilassamento continuo?
+		if( (contRelax[0] & 2) != 2) //rilassamento continuo?
 			ztype = 'B';
 		else
+		{
 			ztype = 'C'; 
+			if( i == 0) //debug
+				cout << "Rilassamento continuo su variabili z_i" << endl;
+		}
 
 		double lb = 0.0;
 		double ub = 1.0;
@@ -328,10 +345,14 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 	for (int i = 0; i < getTotalPotentialNodes(); i++)
 	{  
 		char sptype; 
-		if(contRelax[4] == 0) //rilassamento continuo?
+		if( (contRelax[0] & 1) != 1) //rilassamento continuo?
 			sptype = 'B';
 		else
+		{
 			sptype = 'C'; 
+			if( i == 0) //debug
+				cout << "Rilassamento continuo su variabili sp_i" << endl;
+		}
 		
 		double lb = 0.0; 
 		double ub = 1.0;
@@ -403,7 +424,7 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 		idx.clear();
 		coef.clear();
 	}	
-	cout << "Vincoli (1) creati\n" << endl;
+	cout << "Vincoli (1) creati\n";
 
 	// 1.a
 
@@ -441,7 +462,7 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 		idx.clear();
 		coef.clear();
 	}
-	cout << "Vincoli (1.a) creati\n" << endl;
+	cout << "Vincoli (1.a) creati\n";
 
 	// 2
 
@@ -469,7 +490,7 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 		idx.clear();
 		coef.clear();
 	}
-	cout << "Vincoli (2) creati\n" << endl;
+	cout << "Vincoli (2) creati\n";
 
 	// 3
 
@@ -530,7 +551,7 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 		idx.clear();
 		coef.clear();
 	}
-	cout << "Vincoli (3) creati\n" << endl;
+	cout << "Vincoli (3) creati\n";
 
 	// 3.a
 
@@ -573,7 +594,7 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 		idx.clear();
 		coef.clear();
 	}
-	cout << "Vincoli (3.a) creati\n" << endl;
+	cout << "Vincoli (3.a) creati\n";
 
 	// 4 
 
@@ -631,7 +652,7 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 		coef.clear();
 
 	}
-	cout << "Vincoli (4) creati\n" << endl;
+	cout << "Vincoli (4) creati\n";
 
 	// 4.a 
 
@@ -679,7 +700,7 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 		coef.clear();
 
 	}
-	cout << "Vincoli (4.a) creati\n" << endl;
+	cout << "Vincoli (4.a) creati\n";
 
 	// 5 
 
@@ -715,7 +736,7 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 		idx.clear();
 		coef.clear();
 	}
-	cout << "Vincoli (5) creati\n" << endl;
+	cout << "Vincoli (5) creati\n";
 
 	// 5.a
 
@@ -744,7 +765,7 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 		idx.clear();
 		coef.clear();
 	}
-	cout << "Vincoli (5.a) creati\n" << endl;
+	cout << "Vincoli (5.a) creati\n";
 
 	// 6
 
@@ -822,7 +843,7 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 			coef.clear();
 		}
 	}
-	cout << "Vincoli (6) creati\n" << endl;
+	cout << "Vincoli (6) creati\n";
 
 	//7. gestione interferenza (TX)
 
@@ -881,7 +902,7 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 		idx.clear();
 		coef.clear();
 	}
-	cout << "Vincoli (7) creati\n" << endl;
+	cout << "Vincoli (7) creati\n";
 
 	//7.a
 
@@ -926,7 +947,7 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 		idx.clear();
 		coef.clear();
 	}
-	cout << "Vincoli (7.a) creati\n" << endl;
+	cout << "Vincoli (7.a) creati\n";
 
 	// 8. conservazione flusso
 	sense = 'E';
@@ -969,7 +990,7 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 
 		}
 	}
-	cout << "Vincoli (8) creati\n" << endl;
+	cout << "Vincoli (8) creati\n";
 
 	// 9. legame tra variabili x_i_j e y_j
 	sense = 'L';
@@ -1013,7 +1034,7 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 		}
 	}
 
-	cout << "Vincoli (9) creati\n" << endl;
+	cout << "Vincoli (9) creati\n";
 
 	// 10. un drone non puo' mantenere piu' di s potenziali connessioni simultanee
 	sense = 'L';
@@ -1045,7 +1066,7 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 			coef.clear();
 		}
 	}
-	cout << "Vincoli (10) creati\n" << endl;
+	cout << "Vincoli (10) creati\n";
 
 
 	// 11. non posizionare piu' di d droni
@@ -1068,7 +1089,7 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 	idx.clear();
 	coef.clear();
 
-	cout << "Vincoli (11) creati\n" << endl;
+	cout << "Vincoli (11) creati\n";
 
 	// 6. legame tra variabili c_i_j_k e f_i_j_k //TODO: rimuovere
 	sense = 'E';
@@ -1095,7 +1116,7 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 			}
 		}
 	}
-	cout << "Vincoli (6) creati\n" << endl;
+	cout << "Vincoli (6) creati\n";
 
 	// 12. Legame tra le variabili f_i_j_k e x_i_j
 
