@@ -209,12 +209,12 @@ int main(int argc, char const *argv[])
 	{
 		//int instQuantity, vector<int> users, vector<int> drones, vector<int> gridLength, vector<int> gridHeight, vector<int> gridStep, int tInf, int tSup, double cInf, double cSup, double dInf, double dSup, string instRootName)
 		createBatchInstances(
-			5, //instQuantity
+			1, //instQuantity
 			vector<int> {5}, //users
 			vector<int> {20}, //drones
-			vector<int> {4,10,10,15,20,50}, //gridLength
-			vector<int> {5,5,10,10,10,10},  //gridHeight
-			vector<int> {2,2,2,2,2,2},  //gridStep
+			vector<int> {4}, //gridLength
+			vector<int> {5},  //gridHeight
+			vector<int> {2},  //gridStep
 			0, 	//tInf
 			30, //tSup
 			5,	//cInf

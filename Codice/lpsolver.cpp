@@ -3,6 +3,7 @@
 #include <string>
 #include <fstream>
 #include <chrono>
+#include <ctime>
 #include <algorithm>
 #include "cpxmacro.h"
 #include "lpsolver.h"
@@ -328,7 +329,7 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 	{
 		char stype = 'C'; 
 
-		double lb = -CPX_INFBOUND;
+		double lb = 0.0;
 		double ub = CPX_INFBOUND;
 		
 		snprintf(name, NAME_SIZE, "s_%d", i); //scrive il nome della variabile s_i sulla stringa name[]
@@ -424,7 +425,7 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 		idx.clear();
 		coef.clear();
 	}	
-	cout << "Vincoli (1) creati\n";
+	//cout << "Vincoli (1) creati\n";
 
 	// 1.a
 
@@ -462,11 +463,11 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 		idx.clear();
 		coef.clear();
 	}
-	cout << "Vincoli (1.a) creati\n";
+	//cout << "Vincoli (1.a) creati\n";
 
 	// 2
 
-	sense = 'G'; 
+	sense = 'G'; //TODO: G or L? 
 	matbeg = 0;
 	coef.clear();
 	idx.clear();
@@ -490,7 +491,7 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 		idx.clear();
 		coef.clear();
 	}
-	cout << "Vincoli (2) creati\n";
+	//cout << "Vincoli (2) creati\n";
 
 	// 3
 
@@ -513,7 +514,7 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 		for(int j = getUsrsNum(); j < getTotalPotentialNodes(); j++)
 		{
 			double distance = getDistance(mapGrid[i].x, mapGrid[i].y, mapGrid[j].x, mapGrid[j].y);
-			if(i != j && distance >= getEpsilonNodeRadius() && distance <= getNodeRadius())
+			if(i != j && distance > getEpsilonNodeRadius() && distance <= getNodeRadius()) //R_epsilon excluded
 			{
 				idx.push_back(y_index + j - getUsrsNum());
 				coef.push_back(-getDistanceCoef(j,i));
@@ -525,7 +526,7 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 		for(int j = 0; j < getUsrsNum(); j++)
 		{
 			double distance = getDistance(mapGrid[i].x, mapGrid[i].y, mapGrid[j].x, mapGrid[j].y);
-			if(i != j && distance >= getEpsilonNodeRadius() && distance <= getNodeRadius())
+			if(i != j && distance > getEpsilonNodeRadius() && distance <= getNodeRadius()) //R_epsilon excluded
 			{
 				rhs+= getDistanceCoef(j,i);
 			}
@@ -551,7 +552,7 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 		idx.clear();
 		coef.clear();
 	}
-	cout << "Vincoli (3) creati\n";
+	//cout << "Vincoli (3) creati\n";
 
 	// 3.a
 
@@ -573,7 +574,7 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 		for(int j = getUsrsNum(); j < getTotalPotentialNodes(); j++) // P
 		{
 			double distance = getDistance(mapGrid[i].x, mapGrid[i].y, mapGrid[j].x, mapGrid[j].y);
-			if(i != j && distance >= getEpsilonNodeRadius() && distance <= getNodeRadius())
+			if(i != j && distance > getEpsilonNodeRadius() && distance <= getNodeRadius()) //R_epsilon excluded
 			{
 				idx.push_back(y_index + j - getUsrsNum());
 				coef.push_back(-getDistanceCoef(j,i));
@@ -594,7 +595,7 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 		idx.clear();
 		coef.clear();
 	}
-	cout << "Vincoli (3.a) creati\n";
+	//cout << "Vincoli (3.a) creati\n";
 
 	// 4 
 
@@ -612,10 +613,10 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 		for(int j = getUsrsNum(); j < getTotalPotentialNodes(); j++)
 		{
 			double distance = getDistance(mapGrid[i].x, mapGrid[i].y, mapGrid[j].x, mapGrid[j].y);
-			if(i != j && distance >= getEpsilonNodeRadius() && distance <= getNodeRadius())
+			if(i != j && distance > getEpsilonNodeRadius() && distance <= getNodeRadius()) //R_epsilon excluded
 			{
 				idx.push_back(y_index + j - getUsrsNum());
-				coef.push_back(-getDistanceCoef(j,i));
+				coef.push_back(getDistanceCoef(j,i));
 			}
 		}
 
@@ -624,7 +625,7 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 		for(int j = 0; j < getUsrsNum(); j++)
 		{
 			double distance = getDistance(mapGrid[i].x, mapGrid[i].y, mapGrid[j].x, mapGrid[j].y);
-			if(i != j && distance >= getEpsilonNodeRadius() && distance <= getNodeRadius())
+			if(i != j && distance > getEpsilonNodeRadius() && distance <= getNodeRadius()) //R_epsilon excluded
 			{
 				rhs-= getDistanceCoef(j,i);
 			}
@@ -652,7 +653,7 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 		coef.clear();
 
 	}
-	cout << "Vincoli (4) creati\n";
+	//cout << "Vincoli (4) creati\n";
 
 	// 4.a 
 
@@ -670,10 +671,10 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 		for(int j = getUsrsNum(); j < getTotalPotentialNodes(); j++)
 		{
 			double distance = getDistance(mapGrid[i].x, mapGrid[i].y, mapGrid[j].x, mapGrid[j].y);
-			if(i != j && distance >= getEpsilonNodeRadius() && distance <= getNodeRadius())
+			if(i != j && distance > getEpsilonNodeRadius() && distance <= getNodeRadius()) //R_epsilon excluded
 			{
 				idx.push_back(y_index + j - getUsrsNum());
-				coef.push_back(-getDistanceCoef(j,i));
+				coef.push_back(getDistanceCoef(j,i));
 			}
 		}
 
@@ -685,10 +686,9 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 		idx.push_back(supera_index + i);
 		coef.push_back(-bigM);
 
-		rhs+= bigM;
-
-		idx.push_back(y_index + i);
-		coef.push_back( bigM);
+		//rhs+= bigM;
+		//idx.push_back(y_index + i);
+		//coef.push_back( bigM);
 
 
 		snprintf(name, NAME_SIZE, "c4_%d", rowNumber); //numerazione progressiva dei vincoli
@@ -700,12 +700,12 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 		coef.clear();
 
 	}
-	cout << "Vincoli (4.a) creati\n";
+	//cout << "Vincoli (4.a) creati\n";
 
 	// 5 
 
 	bigM = reductionFactor; //set the big M value for each specific constraint
-	sense = 'G'; 
+	sense = 'G'; //TODO: G or L? 
 	matbeg = 0;
 	coef.clear();
 	idx.clear();
@@ -736,11 +736,11 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 		idx.clear();
 		coef.clear();
 	}
-	cout << "Vincoli (5) creati\n";
+	//cout << "Vincoli (5) creati\n";
 
 	// 5.a
 
-	sense = 'G'; 
+	sense = 'G'; //TODO: G or L? 
 	matbeg = 0;
 	coef.clear();
 	idx.clear();
@@ -765,7 +765,7 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 		idx.clear();
 		coef.clear();
 	}
-	cout << "Vincoli (5.a) creati\n";
+	//cout << "Vincoli (5.a) creati\n";
 
 	// 6
 
@@ -827,7 +827,11 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 		else
 		{
 			// z_i >= y_i 
-
+			sense = 'G'; 
+			matbeg = 0;
+			coef.clear();
+			idx.clear();
+			
 			idx.push_back(z_index + i);
 			coef.push_back(1.0);
 
@@ -843,7 +847,7 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 			coef.clear();
 		}
 	}
-	cout << "Vincoli (6) creati\n";
+	//cout << "Vincoli (6) creati\n";
 
 	//7. gestione interferenza (TX)
 
@@ -902,7 +906,7 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 		idx.clear();
 		coef.clear();
 	}
-	cout << "Vincoli (7) creati\n";
+	//cout << "Vincoli (7) creati\n";
 
 	//7.a
 
@@ -947,7 +951,7 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 		idx.clear();
 		coef.clear();
 	}
-	cout << "Vincoli (7.a) creati\n";
+	//cout << "Vincoli (7.a) creati\n";
 
 	// 8. conservazione flusso
 	sense = 'E';
@@ -990,7 +994,7 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 
 		}
 	}
-	cout << "Vincoli (8) creati\n";
+	//cout << "Vincoli (8) creati\n";
 
 	// 9. legame tra variabili x_i_j e y_j
 	sense = 'L';
@@ -1034,7 +1038,7 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 		}
 	}
 
-	cout << "Vincoli (9) creati\n";
+	//cout << "Vincoli (9) creati\n";
 
 	// 10. un drone non puo' mantenere piu' di s potenziali connessioni simultanee
 	sense = 'L';
@@ -1066,7 +1070,7 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 			coef.clear();
 		}
 	}
-	cout << "Vincoli (10) creati\n";
+	//cout << "Vincoli (10) creati\n";
 
 
 	// 11. non posizionare piu' di d droni
@@ -1089,7 +1093,7 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 	idx.clear();
 	coef.clear();
 
-	cout << "Vincoli (11) creati\n";
+	//cout << "Vincoli (11) creati\n";
 
 	// 6. legame tra variabili c_i_j_k e f_i_j_k //TODO: rimuovere
 	sense = 'E';
@@ -1116,7 +1120,7 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 			}
 		}
 	}
-	cout << "Vincoli (6) creati\n";
+	//cout << "Vincoli (6) creati\n";
 
 	// 12. Legame tra le variabili f_i_j_k e x_i_j
 
@@ -1157,7 +1161,7 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 			coef.clear();
 		}
 	}
-	cout << "Vincoli (12) creati\n" << endl;
+	//cout << "Vincoli (12) creati\n" << endl;
 }
 
 
@@ -1266,17 +1270,23 @@ solution_t *solveLP(CEnv env, Prob lp, string baseFileName, bool verbose, int co
 		CHECKED_CPX_CALL(CPXwriteprob, env, lp, lpFile.c_str(), NULL);
 	// optimize
 
-	//cout<<"Exec" <<endl;
+	cout << endl << "--------------------------------------------" << endl << endl;
+	
+	start = std::chrono::high_resolution_clock::now(); //debug: output timestamp 
+	std::time_t timestamp = std::chrono::system_clock::to_time_t(start);
+	cout << "Optimization started at: " << std::ctime(&timestamp) << endl;
+	
 	start = std::chrono::high_resolution_clock::now(); //timestamp di inizio
 		CHECKED_CPX_CALL(CPXmipopt, env, lp);
 	end = std::chrono::high_resolution_clock::now(); //timestamp di fine
-	//cout<<"end exec" << endl;
-
+	
+	timestamp = std::chrono::system_clock::to_time_t(end); //debug: output timestamp 
+	cout << "Optimization finished at: " << std::ctime(&timestamp) << endl;
+	
 
 	cout << "Istanza eseguita in "
 		<< std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() //casting per la conversione in millisecondi; (end-start).count() calcola la differenza di tempo e la restituisce come valore numerico
 		<< "ms" << " (" << std::chrono::duration_cast<std::chrono::seconds>(end - start).count() << "s c.ca).\n";
-	cout << "--------------------------------------------" << endl;
 
 	//istanziazione della struttura dati per la soluzione
 
@@ -1284,7 +1294,7 @@ solution_t *solveLP(CEnv env, Prob lp, string baseFileName, bool verbose, int co
 	{
 		double objval = 0;
 		const int size = getPosNum();
-		double solutionArray[size];
+		double solutionArray[size]; 
 
 		solution = new solution_t;
 

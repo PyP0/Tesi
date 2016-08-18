@@ -31,7 +31,7 @@ int droneRXCapacity = 10000;
 
 int nodeRadius = 3;
 
-int epsilonNodeRadius = 1;
+int epsilonNodeRadius = 2;
 
 //parametri griglia
 int length = 0;
