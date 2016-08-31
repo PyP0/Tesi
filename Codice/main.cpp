@@ -11,6 +11,7 @@
 #include "instance.h"
 #include "utility.h"
 #include "lpsolver.h"
+#include "getRSS.h"
 
 
 using namespace std;
@@ -68,6 +69,10 @@ solution_t *executeInstance(string fileName, bool verbose, int contRelax[])
 	string solution = baseFileName + ".txt";
 	string solFile = baseFileName + ".sol";
 	string clpFile = baseFileName + ".clp";
+
+	string logFile = baseFileName + ".log";
+	CPXFILEptr logF = CPXfopen(logFile.c_str(),"w"); 
+	CPXsetlogfile(env,logF);
 
 	if (loadInstance(instance.c_str()) != 0)
 	{
@@ -136,6 +141,7 @@ solution_t *executeInstance(string fileName, bool verbose, int contRelax[])
 			return NULL;
 		}
 	}
+	CPXfclose(logF);
 	return instSolution;
 
 }
@@ -211,7 +217,7 @@ int main(int argc, char const *argv[])
 		createBatchInstances(
 			1, //instQuantity
 			vector<int> {5}, //users
-			vector<int> {20}, //drones
+			vector<int> {200}, //drones
 			vector<int> {4}, //gridLength
 			vector<int> {5},  //gridHeight
 			vector<int> {2},  //gridStep
@@ -325,10 +331,12 @@ int main(int argc, char const *argv[])
 							return 1;
 						}
 					}
+
+					cout << "Max physical memory usage: " << getPeakRSS( ) << " KB" << endl;
 				}
 				else
 					cerr << __FUNCTION__ << "(): Impossibile creare il file: " << csvCumulativeFile << endl;
-				return 0;
+				return 1;
 			}
 			else
 			{
@@ -347,11 +355,18 @@ int main(int argc, char const *argv[])
 				string pathToMasterSolFile(argv[2]);
 				pathToMasterSolFile = pathToMasterSolFile + MASTER_SOLUTIONS_FILE;
 				
-				return executeMaster(loadFileList(pathToMaster.c_str()), pathToMasterSolFile.c_str(), verbose, contRelax);
+				int status = executeMaster(loadFileList(pathToMaster.c_str()), pathToMasterSolFile.c_str(), verbose, contRelax);
+
+				cout << "Max physical memory usage: " << getPeakRSS( ) << " KB" << endl;
+
+				return status;
 			}
 			else
 			{
 				int status = executeMaster(loadFileList(MASTER_FILE), MASTER_SOLUTIONS_FILE, verbose, contRelax);
+				
+				cout << "Max physical memory usage: " << getPeakRSS( ) << " KB" << endl;
+
 				return status;
 			}
 		}
@@ -364,9 +379,10 @@ int main(int argc, char const *argv[])
 			else
 			{
 				delete instSolution;
+				
+				cout << "Max physical memory usage: " << getPeakRSS( ) << " KB" << endl;
 				return 0;
 			}
 		}
-		
 	}
 }
