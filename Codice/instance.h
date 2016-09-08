@@ -25,7 +25,7 @@ struct nodesCoordinates_t
 extern std::vector<double> deployCost; 
 
 //matrice dei costi
-extern std::vector< std::vector< std::vector<double> > > c;
+//extern std::vector< std::vector< std::vector<double> > > c;
 
 //matrice di capacità degli archi
 extern std::vector< std::vector<double> > u;
@@ -51,6 +51,9 @@ int getMaxConnections();
 int getTotalPotentialNodes();
 int getTotalNodes();
 
+double getCost(int,int,int);
+
+bool isCEmpty();
 
 double getDistanceCoef(int,int);
 double getInterferenceFactor(int, int);

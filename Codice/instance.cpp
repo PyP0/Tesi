@@ -140,6 +140,19 @@ double getInterferenceFactor(int i, int j)
 	return 1.0; //TODO
 }
 
+double getCost(int i, int j, int k)
+{
+	return c[i][j][k];
+}
+
+bool isCEmpty()
+{
+	if (c.size() > 0 && c[0].size() > 0 && c[0][0].size() > 0)
+		return false;
+	else
+		return true;
+}
+
 //costruisce la matrice b partendo dalla matrice di traffico 
 //la matrice b e' pre-inizializzata al valore 0
 static void convertIntoBMatrix()
@@ -668,6 +681,8 @@ int loadInstance(const char *filename)
 {
 	int result = 0;
 	ifstream file;
+	
+	long int sparseCounter = 0, nnzCounter = 0; //debug
 
 	n = 0, d = 0, P = 0;
 	totalNodes = 0;
@@ -713,18 +728,24 @@ int loadInstance(const char *filename)
 								for (unsigned int k = 0; k < c[0][0].size(); k++)
 								{
 									c[i][j][k]= DISCONNECTED_COST;
+									
+									sparseCounter++; //debug
 								}
 							}
 							else
 							{
+								nnzCounter++; //debug
 								for (unsigned int k = 1; k < c[0][0].size(); k++)
 								{
 									file >> c[i][j][k];
+									
+									nnzCounter++; //debug
 								}
 							}
 						}
 					}
-
+					
+					cout << "Zero / Non-Zero elements in matrix C: " << sparseCounter << " / " << nnzCounter << endl; //debug
 	
 					for(int i = 0; i< totalPotentialNodes; i++)
 					{

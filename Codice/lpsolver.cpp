@@ -29,8 +29,7 @@ int z_index = 0;
 int bigM = 1000000; //default value
 
 
-
-static int getSolutionFlowMatrix(CEnv env, Prob lp, vector< vector< vector<int> > > &flow)
+/*static int getSolutionFlowMatrix(CEnv env, Prob lp, vector< vector< vector<int> > > &flow)
 {
 	int status = 0;
 	try
@@ -108,17 +107,17 @@ static int getSolutionFlowMatrix(CEnv env, Prob lp, vector< vector< vector<int> 
 		status = 1;
 		return status;
 	}
-}
+}*/
 
-static bool areOutOfSight(int i, int j)
+static bool areOutOfSight(int i, int j) //TODO: controllarne effettiva funzionalita'
 {
 	int k = 0;
 	bool flag = true;
-	if (c.size() > 0) //c e' gia' stato allocato?
+	if (isCEmpty() == false) //c e' gia' stato allocato?
 	{
 		while (k < getCommsNum() && flag == true)
 		{
-			if (c[i][j][k] <= getThreshold())
+			if (getCost(i,j,k) <= getThreshold())
 				flag = false;
 			k++;
 		}
@@ -137,6 +136,7 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 	const double zero = 0.0;
 	const double uno = 1.0;
 
+	cout << "Current memory usage, pre-model: " << getCurrentRSS( ) / 1024 << "KB" << endl;
 	//allocazione mappe
 	vector< vector< vector<int> > > fMap(getTotalPotentialNodes(), vector< vector<int> >(getTotalPotentialNodes(), vector<int>(getCommsNum(), -1)));
 
@@ -169,14 +169,16 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 			{
 
 				//if (i != j) //c'è un arco tra i nodi i e j, quindi creo la corrispondente variabile di flusso fijk
-				if (i != j && (c[i][j][k] <= getThreshold()) && !(i < getUsrsNum() && j < getUsrsNum())) //***
+				if (i != j && (getCost(i,j,k) <= getThreshold()) && !(i < getUsrsNum() && j < getUsrsNum())) //***
 				{		
 					double lb = 0.0;
 					double ub = CPX_INFBOUND;
-
+					
+					double cost = getCost(i,j,k);
+					
 					snprintf(name, NAME_SIZE, "f_%d_%d_%d", i, j, k); //scrive il nome della variabile f_i_j_k sulla stringa name[]
 					char* fname = (char*)(&name[0]);
-					CHECKED_CPX_CALL(CPXnewcols, env, lp, 1, &c[i][j][k], &lb, &ub, &ftype, &fname);   //costruisce la singola variabile 
+					CHECKED_CPX_CALL(CPXnewcols, env, lp, 1, &cost, &lb, &ub, &ftype, &fname);   //costruisce la singola variabile 
 
 					//costruzione della map
 					fMap[i][j][k] = fMapIndex;
@@ -1332,7 +1334,7 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 			{
 				for (int k = 0; k < getCommsNum(); k++)
 				{
-					if (c[i][j][k] > getThreshold() && fMap[i][j][k] != -1) //***
+					if (getCost(i,j,k) > getThreshold() && fMap[i][j][k] != -1) //***
 					{
 						double coef = 1.0;
 						int idx = fMap[i][j][k];
@@ -1388,13 +1390,137 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 			coef.clear();
 		}
 	}
+
+	//extra: test
+	/*sense = 'E';
+	matbeg = 0;
+	idx.clear();
+	coef.clear();
+
+	idx.push_back(y_index + 9);
+	coef.push_back(1.0);
+
+	snprintf(name, NAME_SIZE, "cE_%d", rowNumber); //numerazione progressiva dei vincoli
+	rowname = (char*)(&name[0]);
+	rowNumber++;
+	
+	CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idx.size(), &uno, &sense, &matbeg, &idx[0], &coef[0], NULL, &rowname);
+	idx.clear();
+	coef.clear();
+
+	//extra: test
+	sense = 'E';
+	matbeg = 0;
+	idx.clear();
+	coef.clear();
+
+	idx.push_back(y_index + 11);
+	coef.push_back(1.0);
+
+	snprintf(name, NAME_SIZE, "cE_%d", rowNumber); //numerazione progressiva dei vincoli
+	rowname = (char*)(&name[0]);
+	rowNumber++;
+	
+	CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idx.size(), &uno, &sense, &matbeg, &idx[0], &coef[0], NULL, &rowname);
+	idx.clear();
+	coef.clear();
+
+	//extra: test
+	sense = 'E';
+	matbeg = 0;
+	idx.clear();
+	coef.clear();
+
+	idx.push_back(y_index + 15);
+	coef.push_back(1.0);
+
+	snprintf(name, NAME_SIZE, "cE_%d", rowNumber); //numerazione progressiva dei vincoli
+	rowname = (char*)(&name[0]);
+	rowNumber++;
+	
+	CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idx.size(), &uno, &sense, &matbeg, &idx[0], &coef[0], NULL, &rowname);
+	idx.clear();
+	coef.clear();
+
+	//extra: test
+	sense = 'E';
+	matbeg = 0;
+	idx.clear();
+	coef.clear();
+
+	idx.push_back(y_index + 19);
+	coef.push_back(1.0);
+
+	snprintf(name, NAME_SIZE, "cE_%d", rowNumber); //numerazione progressiva dei vincoli
+	rowname = (char*)(&name[0]);
+	rowNumber++;
+	
+	CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idx.size(), &uno, &sense, &matbeg, &idx[0], &coef[0], NULL, &rowname);
+	idx.clear();
+	coef.clear();
+
+	//extra: test
+	sense = 'E';
+	matbeg = 0;
+	idx.clear();
+	coef.clear();
+
+	idx.push_back(y_index + 23);
+	coef.push_back(1.0);
+
+	snprintf(name, NAME_SIZE, "cE_%d", rowNumber); //numerazione progressiva dei vincoli
+	rowname = (char*)(&name[0]);
+	rowNumber++;
+	
+	CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idx.size(), &uno, &sense, &matbeg, &idx[0], &coef[0], NULL, &rowname);
+	idx.clear();
+	coef.clear();
+
+	//extra: test
+	sense = 'E';
+	matbeg = 0;
+	idx.clear();
+	coef.clear();
+
+	idx.push_back(y_index + 25);
+	coef.push_back(1.0);
+
+	snprintf(name, NAME_SIZE, "cE_%d", rowNumber); //numerazione progressiva dei vincoli
+	rowname = (char*)(&name[0]);
+	rowNumber++;
+	
+	CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idx.size(), &uno, &sense, &matbeg, &idx[0], &coef[0], NULL, &rowname);
+	idx.clear();
+	coef.clear();*/
+
+
 	//cout << "Vincoli (12) creati\n" << endl;
+
+	//test MIP start
+	/*
+	if(CPXsetintparam(env, CPX_PARAM_ADVIND, 1) != 0) 
+		cerr << __FUNCTION__ << "(): Impossibile settare MIP start." << endl;
+
+	int beg[] = {0};
+	int mcnt = 1;
+	int nzcnt = 1;
+	int varindices[] = {y_index + 23};
+	double values[] = {1.0};
+	int effortlevel[] = {CPX_MIPSTART_SOLVEMIP};
+
+	
+
+	if (CPXaddmipstarts(env, lp, mcnt, nzcnt, beg, varindices, values, effortlevel, NULL) != 0)
+		cerr << __FUNCTION__ << "(): Errore MIP start" << endl;
+	*/
+
 	cout << "Max physical memory usage at model creation: " << getPeakRSS( ) << " KB" << endl;
+	cout << "Current memory usage, post-model: " << getCurrentRSS( ) / 1024 << "KB" << endl;
 }
 
 
 //si utilizza il tool esterno DOT per creare un'immagine del grafo. Per fare cio' prima si codifica il grafo nel formato dot su un file, e poi si lancia automaticamente il tool
-int printDOTGraph(string filename)
+/*int printDOTGraph(string filename)
 {
 	ofstream file;
 	file.open(filename, ios::out);
@@ -1405,7 +1531,7 @@ int printDOTGraph(string filename)
 	}
 	else
 	{
-		if (c.size() <= 0)
+		if (isCEmpty() == true)
 		{
 			cerr << __FUNCTION__ << "(): Grafo vuoto." << endl;
 			return 1;
@@ -1419,13 +1545,13 @@ int printDOTGraph(string filename)
 				{
 					if (i != j && !areOutOfSight(i, j))
 					{
-						/*
-						Per ogni arco trovato, si stampa una riga su file che codifica l'arco e i due nodi suoi estremi,
-						nel formato: idNodo1 -> idNodo2. arrowhead="none" permette di rappresentare l'arco come non orientato, mentre
-						l'attributo xlabel permette di etichettare l'arco con una stringa, in questo caso il tipo di vincolo ( = o >= )
-						e il valore wij corrispondente.
-						*/
-						file << "\t" << i << " -> " << j << " [xlabel=\"=" << c[i][j][0] << "\"];\n";
+						
+						//Per ogni arco trovato, si stampa una riga su file che codifica l'arco e i due nodi suoi estremi,
+						//nel formato: idNodo1 -> idNodo2. arrowhead="none" permette di rappresentare l'arco come non orientato, mentre
+						//l'attributo xlabel permette di etichettare l'arco con una stringa, in questo caso il tipo di vincolo ( = o >= )
+						//e il valore wij corrispondente.
+						
+						file << "\t" << i << " -> " << j << " [xlabel=\"=" << getCost(i,j,0) << "\"];\n";
 						//fprintf(file,"\t%d -> %d [arrowhead=\"none\", xlabel=\"=%d\"];\n",i,j,c[i][j][0]);		
 
 					}
@@ -1435,7 +1561,7 @@ int printDOTGraph(string filename)
 		file << "}" << endl;
 		return 0;
 	}
-}
+}*/
 
 void printConflictFile(string clpFile, CEnv env, Prob lp)
 {			
@@ -1486,13 +1612,16 @@ void printSolution(solution_t *solution)
 
 solution_t *solveLP(CEnv env, Prob lp, string baseFileName, bool verbose, int contRelax[])
 {
+	cout << "Current memory usage, before post-model: " << getCurrentRSS( ) / 1024 << " KB" << endl;
 
 	string lpFile = baseFileName + ".lp";
 	//dichiarazione dei timepoint/epoch (strutture dati in cui porre i tempi di inizio e fine dell'esecuzione di ogni istanza) 
 	std::chrono::high_resolution_clock::time_point start, end;
 	solution_t *solution = NULL;
+	
 	// setup LP
 	setupLP(env, lp, contRelax);
+	cout << "Current memory usage, after post-model: " << getCurrentRSS( ) / 1024 << " KB" << endl;
 	
 	if(verbose == true)	
 		CHECKED_CPX_CALL(CPXwriteprob, env, lp, lpFile.c_str(), NULL);

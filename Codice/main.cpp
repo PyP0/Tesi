@@ -60,9 +60,15 @@ solution_t *executeInstance(string fileName, bool verbose, int contRelax[])
 
 	DECL_ENV(env);
 	DECL_PROB(env, lp);
+
+	if(CPXsetintparam(env, CPX_PARAM_DATACHECK, 1) != 0) 
+		cerr << __FUNCTION__ << "(): 1 Impossibile settare uno o piu' parametri di CPLEX." << endl;
 	
 	if(CPXsetintparam(env, CPX_PARAM_CONFLICTDISPLAY, 2) != 0) 
-		cerr << __FUNCTION__ << "(): Impossibile settare uno o piu' parametri di CPLEX." << endl;
+		cerr << __FUNCTION__ << "(): 2 Impossibile settare uno o piu' parametri di CPLEX." << endl;
+	
+	//if ( CPXreadcopyparam(env, "CPLEXparams.prm") != 0)
+	//	cerr << __FUNCTION__ << "(): Impossibile leggere i parametri CPLEX dal file di configurazione, si usera' la configurazione standard." << endl;
 	
 	string baseFileName (fileName);
 	string instance = baseFileName;
@@ -143,7 +149,6 @@ solution_t *executeInstance(string fileName, bool verbose, int contRelax[])
 	}
 	CPXfclose(logF);
 	return instSolution;
-
 }
 
 int executeMaster(vector< string > fileList, string masterSolutionsFile, bool verbose, int contRelax[])
@@ -183,6 +188,8 @@ int executeMaster(vector< string > fileList, string masterSolutionsFile, bool ve
 					file << instSolution->execTime << "\t";
 					file << dronesCount << "/" << getDrnsNum() << "\t";
 					file << instSolution->statusCode << endl;
+
+					delete instSolution;
 				}
 			}
 		}
@@ -217,9 +224,9 @@ int main(int argc, char const *argv[])
 		createBatchInstances(
 			1, //instQuantity
 			vector<int> {5}, //users
-			vector<int> {200}, //drones
-			vector<int> {4}, //gridLength
-			vector<int> {5},  //gridHeight
+			vector<int> {20}, //drones
+			vector<int> {5}, //gridLength
+			vector<int> {10},  //gridHeight
 			vector<int> {2},  //gridStep
 			0, 	//tInf
 			30, //tSup
