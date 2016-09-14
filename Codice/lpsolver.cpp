@@ -487,9 +487,9 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 		idx.push_back(z_index + i);
 		coef.push_back(-reductionFactor);
 
-		//TODO: test per relazionare le zi con le yi
+		//1.1 TODO: test per relazionare le zi con le yi
 		// M(1-y_i)
-		if( i >= getUsrsNum()) // P
+		/*if( i >= getUsrsNum()) // P
 		{
 			bigM = 2 * reductionFactor;
 			// - M(1-y_i)
@@ -497,7 +497,7 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 			coef.push_back(-bigM);
 			rhs = - bigM;
 
-		}
+		}*/
 
 		snprintf(name, NAME_SIZE, "c2_%d", rowNumber); //numerazione progressiva dei vincoli
 		char* rowname = (char*)(&name[0]);
@@ -510,12 +510,13 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 	}
 	//cout << "Vincoli (2) creati\n";
 	
-	//TODO: test
-	sense = 'L';  
+	//1.1 TODO: test
+	//2.b
+	/*sense = 'L';  
 	matbeg = 0;
 	coef.clear();
 	idx.clear();
-	for( int i = 0; i < getTotalPotentialNodes(); i++)
+	for( int i = 0; i < getTotalPotentialNodes(); i++)  // V'
 	{
 		// sconto
 		idx.push_back(s_index + i);
@@ -527,58 +528,6 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 
 
 		CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idx.size(), &reductionFactor, &sense, &matbeg, &idx[0], &coef[0], NULL, &rowname);
-		idx.clear();
-		coef.clear();
-	}
-	
-	//TODO: test
-	/*sense = 'L';  
-	matbeg = 0;
-	coef.clear();
-	idx.clear();
-	
-	bigM = 3*reductionFactor; //TODO
-	for( int i = 0; i < getTotalPotentialNodes(); i++)
-	{
-		// sconto
-		idx.push_back(s_index + i);
-		coef.push_back(1.0);
-		
-		idx.push_back(supera_index + i);
-		coef.push_back(-bigM);
-
-		snprintf(name, NAME_SIZE, "cX_%d", rowNumber); //numerazione progressiva dei vincoli
-		char* rowname = (char*)(&name[0]);
-		rowNumber++;
-
-
-		CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idx.size(), &reductionFactor, &sense, &matbeg, &idx[0], &coef[0], NULL, &rowname);
-		idx.clear();
-		coef.clear();
-	}
-	
-	sense = 'G';  
-	matbeg = 0;
-	coef.clear();
-	idx.clear();
-	
-	bigM = 3*reductionFactor; //TODO
-	for( int i = 0; i < getTotalPotentialNodes(); i++)
-	{
-		double rhs = reductionFactor - bigM;
-		// sconto
-		idx.push_back(s_index + i);
-		coef.push_back(1.0);
-		
-		idx.push_back(supera_index + i);
-		coef.push_back(-bigM);
-
-		snprintf(name, NAME_SIZE, "cX_%d", rowNumber); //numerazione progressiva dei vincoli
-		char* rowname = (char*)(&name[0]);
-		rowNumber++;
-
-
-		CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idx.size(), &rhs, &sense, &matbeg, &idx[0], &coef[0], NULL, &rowname);
 		idx.clear();
 		coef.clear();
 	}*/
@@ -778,7 +727,6 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 		//idx.push_back(y_index + i);
 		//coef.push_back( bigM);
 
-
 		snprintf(name, NAME_SIZE, "c4_%d", rowNumber); //numerazione progressiva dei vincoli
 		char* rowname = (char*)(&name[0]);
 		rowNumber++;
@@ -793,13 +741,12 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 	// 5 
 
 	bigM = 2 * reductionFactor; //set the big M value for each specific constraint
-	sense = 'G'; //TODO: G or L? 
+	sense = 'G';
 	matbeg = 0;
 	coef.clear();
 	idx.clear();
 	
-	//TODO: test rimozione -M(...)
-	/*for(int i = getUsrsNum(); i < getTotalPotentialNodes(); i++) // P
+	for(int i = getUsrsNum(); i < getTotalPotentialNodes(); i++) // P
 	{
 		double rhs = 0;
 		
@@ -824,8 +771,10 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 		CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idx.size(), &rhs, &sense, &matbeg, &idx[0], &coef[0], NULL, &rowname);
 		idx.clear();
 		coef.clear();
-	}*/
-	for(int i = getUsrsNum(); i < getTotalPotentialNodes(); i++) // P
+	}
+
+	//1.1 TODO: test rimozione -M(...)
+	/*for(int i = getUsrsNum(); i < getTotalPotentialNodes(); i++) // P
 	{
 		// sconto_i
 		idx.push_back(s_index + i);
@@ -842,12 +791,12 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 		CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idx.size(), &zero, &sense, &matbeg, &idx[0], &coef[0], NULL, &rowname);
 		idx.clear();
 		coef.clear();
-	}
+	}*/
 	//cout << "Vincoli (5) creati\n";
 
 	// 5.a
 
-	sense = 'G'; //TODO: G or L? 
+	sense = 'G';  
 	matbeg = 0;
 	coef.clear();
 	idx.clear();
@@ -873,8 +822,9 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 	//cout << "Vincoli (5.a) creati\n";
 
 	
-	//TODO: test  IF_si >= smax THEN_spi=1-y_i
-	bigM = 2 * reductionFactor; //set the big M value for each specific constraint
+	//1.1 TODO: test  IF_si >= smax THEN_spi=1-y_i
+	// 5.b
+	/*bigM = 2 * reductionFactor; //set the big M value for each specific constraint
 	sense = 'L'; 
 	matbeg = 0;
 	coef.clear();
@@ -896,7 +846,7 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 		CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idx.size(), &rhs, &sense, &matbeg, &idx[0], &coef[0], NULL, &rowname);
 		idx.clear();
 		coef.clear();
-	}
+	}*/
 	
 	// 6
 
@@ -958,7 +908,7 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 		else  // |D_i_epsilon| > 0
 		{
 			// z_i >= y_i 
-			/*sense = 'G'; 
+			sense = 'G'; 
 			matbeg = 0;
 			coef.clear();
 			idx.clear();
@@ -975,10 +925,10 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 
 			CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idx.size(), &zero, &sense, &matbeg, &idx[0], &coef[0], NULL, &rowname);
 			idx.clear();
-			coef.clear();*/
+			coef.clear();
 
-			//TODO: test  zi == 1
-			sense = 'E'; 
+			//1.1 TODO: test  zi == 1
+			/*sense = 'E'; 
 			matbeg = 0;
 			coef.clear();
 			idx.clear();
@@ -992,7 +942,7 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 
 			CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idx.size(), &uno, &sense, &matbeg, &idx[0], &coef[0], NULL, &rowname);
 			idx.clear();
-			coef.clear();
+			coef.clear();*/
 
 		}
 	}
@@ -1516,6 +1466,11 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 
 	cout << "Max physical memory usage at model creation: " << getPeakRSS( ) << " KB" << endl;
 	cout << "Current memory usage, post-model: " << getCurrentRSS( ) / 1024 << "KB" << endl;
+
+	/*clearC();
+	cout << "*Max physical memory usage at model creation: " << getPeakRSS( ) << " KB" << endl;
+	cout << "*Current memory usage, post-model: " << getCurrentRSS( ) / 1024 << "KB" << endl;*/
+	
 }
 
 
@@ -1688,7 +1643,7 @@ solution_t *solveLP(CEnv env, Prob lp, string baseFileName, bool verbose, int co
 
 	interfaceToGraphicModule(env, lp, string(baseFileName +".buf.txt").c_str());
 	
-	if(verbose == true)	
+	//if(verbose == true)	
 		printSimplifiedSolFile(env, lp, string(baseFileName + ".var.txt").c_str());
 	return solution;
 }

@@ -29,9 +29,9 @@ int s = 10; //numero massimo connessioni sostenibili da un drone
 int droneTXCapacity = 20000;
 int droneRXCapacity = 10000;
 
-int nodeRadius = 3;
+int nodeRadius = 3; //metri
 
-int epsilonNodeRadius = 2;
+int epsilonNodeRadius = 2; //metri
 
 //parametri griglia
 int length = 0;
@@ -152,6 +152,18 @@ bool isCEmpty()
 	else
 		return true;
 }
+
+/*void clearC()
+{
+	for(unsigned int i = 0; i < c.size(); i++)
+	{
+		for(unsigned int j = 0; j < c[0].size(); j++)
+		{
+			c[i][j].erase();
+		}
+		c[i].erase();
+	}
+}*/
 
 //costruisce la matrice b partendo dalla matrice di traffico 
 //la matrice b e' pre-inizializzata al valore 0
