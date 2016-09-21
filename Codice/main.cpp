@@ -13,6 +13,8 @@
 #include "lpsolver.h"
 #include "getRSS.h"
 
+#include "radiopropmodel.h"
+
 
 using namespace std;
 
@@ -241,6 +243,13 @@ int main(int argc, char const *argv[])
 		if(string(argv[1]).compare(string("-h")) == 0)
 		{
 			printHelper();
+			return 0;
+		}
+
+		if(string(argv[1]).compare(string("-t")) == 0) //test branch
+		{
+
+			shadowingTest(10000,1.02802e-10); 
 			return 0;
 		}
 		

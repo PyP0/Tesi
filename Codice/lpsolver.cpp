@@ -9,6 +9,7 @@
 #include "lpsolver.h"
 #include "utility.h"
 #include "getRSS.h"
+#include "radiopropmodel.h"
 
 using namespace std;
 
@@ -146,7 +147,7 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 
 	vector< vector<int> > zMap(getPosNum(), vector<int>(getPosNum(), -1));
 
-	
+	vector< vector<double> > interference(getTotalPotentialNodes(), vector<double>(getTotalPotentialNodes(), -1));
 
 	//aggiunta delle variabili f_i_j_k, una per volta, con i!=j
 	//nota: la variabile f_i_j_k e' distinta dalla variabile f_j_i_k
@@ -368,6 +369,22 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 	}
 
 	cout << "Sono state create " << CPXgetnumcols(env, lp) - supera_index << " variabili sp_i" << endl;  //numero totale delle vars create
+
+
+	//stima statica delle interferenze basata sul modello di Shadowing di ns-2
+	for(unsigned int i = 0; i < interference.size(); i++)
+	{
+		for(unsigned int j = 0; j < interference[0].size(); j++)
+		{
+			if(i != j)
+			{
+				interference[i][j]= getInterferencePercentage(mapGrid[j].x, mapGrid[j].y, mapGrid[i].x, mapGrid[i].y); 
+
+				cout << interference[i][j] << " ";
+			}
+		}
+		cout << endl;
+	}
 
 
 	//=========================================================================
