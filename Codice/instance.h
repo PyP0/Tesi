@@ -51,12 +51,18 @@ int getMaxConnections();
 int getTotalPotentialNodes();
 int getTotalNodes();
 
+double getWCInterferencePercentage();
+double getReductionFactor();
+double getInterferenceCoef(int, int);
+double getInterference(int, int); //related to the matrix
 double getCost(int,int,int);
 
 bool isCEmpty();
 
-double getDistanceCoef(int,int);
-double getInterferenceFactor(int, int);
+double getInterferenceFactor(int, int);   
+
+void shadowingTest(int); 
+void interferenceModelTest();
 void printNodesIOFlow();
 void printGrid();
 void printTrafficMatrix();

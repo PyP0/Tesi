@@ -1,5 +1,6 @@
 #include "instance.h"
 #include "utility.h"
+#include "radiopropmodel.h"
 #include <iostream>
 #include <fstream>
 #include <unordered_map>
@@ -29,9 +30,9 @@ int s = 10; //numero massimo connessioni sostenibili da un drone
 int droneTXCapacity = 20000;
 int droneRXCapacity = 10000;
 
-int nodeRadius = 3; //metri
+int nodeRadius = 3;//250;//3; //metri
 
-int epsilonNodeRadius = 2; //metri
+int epsilonNodeRadius = 2;//20; //2; //metri
 
 //parametri griglia
 int length = 0;
@@ -45,15 +46,49 @@ map<int, nodesCoordinates_t> mapGrid;
 std::vector< std::vector< std::vector<double> > > c(totalPotentialNodes, std::vector< std::vector<double> >(totalPotentialNodes, std::vector<double>(K, DISCONNECTED_COST)));
 
 //matrice bilanciamento flussi
-std::vector< std::vector<double> > b(totalPotentialNodes, std::vector<double>(K, 0));
+std::vector< std::vector<double> > b(totalPotentialNodes, std::vector<double>(K, 0)); 
 
 std::vector<double> deployCost(P, 50); //costo deployment drone
 
 std::vector< std::vector<int> > t(n, std::vector<int>(n, -1)); //matrice di traffico
 
+vector< vector<double> > interference(totalPotentialNodes, vector<double>(totalPotentialNodes, -1)); //matrice interferenza statica
+
 std::vector< int > txCapacity();
 
 std::vector< int > rxCapacity(); 
+
+static double getInterferencePercentage(double xt, double yt, double xr, double yr)
+{
+  int n = 1000; //numero di iterazioni
+  int counter = 0;
+  double dist = getDistance(xt,yt,xr,yr);
+  double rxThresh = getRXThresh();
+
+  if(dist <= getEpsilonNodeRadius()) //max interference percentage
+  {
+  	return getWCInterferencePercentage();
+  }
+
+  if(dist > getNodeRadius()) // out of range
+  {
+  	return 0.0;
+  }
+  
+  for(int i = 0; i < n; i++)
+  {
+    double Pr = shadowingPr(dist);
+
+    if(Pr >= rxThresh)
+      counter++;
+  }
+  return ((double)counter / (double)n);
+} 
+
+double getInterferenceFactor(int i, int j)
+{
+	return 1.0; //TODO
+}
 
 int getUsrsNum()
 {
@@ -130,14 +165,9 @@ int getTotalNodes()
 	return totalNodes;
 }
 
-double getDistanceCoef(int i, int j)
+double getInterference(int i, int j)
 {
-	return 1.0; //TODO
-}
-
-double getInterferenceFactor(int i, int j)
-{
-	return 1.0; //TODO
+	return interference[i][j];
 }
 
 double getCost(int i, int j, int k)
@@ -164,6 +194,57 @@ bool isCEmpty()
 		c[i].erase();
 	}
 }*/
+
+double getWCInterferencePercentage()
+{
+	double e = exp(1);
+	return ( (2.0 * e) - 1.0) / (2.0 * e);
+
+}
+double getReductionFactor()
+{
+	return getRXCapacity() * getWCInterferencePercentage();
+} 
+
+double getInterferenceCoef(int i, int j)
+{
+	//return (getReductionFactor() * getInterferencePercentage(mapGrid[i].x, mapGrid[i].y, mapGrid[j].x, mapGrid[j].y));
+	double interference = getReductionFactor() * getInterferencePercentage(mapGrid[i].x, mapGrid[i].y, mapGrid[j].x, mapGrid[j].y);
+	return interference;
+}
+
+void interferenceModelTest()
+{
+  std::cout << "Shadowing test:" << std::endl;
+  std::cout << "Used RXThresh: " << getRXThresh() << std::endl;
+  std::cout << "dist\tinterference" << std::endl;
+  for (int i = 0; i < 300; i++)
+  {
+    double interf = getInterferencePercentage(0.0,0.0,(double)i,0.0);
+    std::cout << i << "\t" <<  interf << std::endl;
+  }
+}
+
+void shadowingTest(int n)
+{
+  double rxThresh = getRXThresh();	
+  std::cout << "Shadowing test:" << std::endl;
+  std::cout << "Used RXThresh: " << rxThresh << std::endl;
+  std::cout << "dist\tfreq\t\t\t%" << std::endl;
+  for (int i = 0; i < 300; i++)
+  {
+    int counter = 0;
+    for(int j = 0; j < n; j++)
+    {
+	  double dist = getDistance(0.0,0.0,(double)i,0.0);
+      double Pr = shadowingPr(dist);
+
+      if(Pr >= rxThresh)
+        counter++;
+    }
+    std::cout << i << "\t" << counter << "/" << n << "\t\t\t" << ((double)counter/(double)n*100.0) << std::endl;
+  }
+}
 
 //costruisce la matrice b partendo dalla matrice di traffico 
 //la matrice b e' pre-inizializzata al valore 0
@@ -422,6 +503,13 @@ static int initDataStructures(int n, int d, int P)
 				b[i].resize(K, 0);
 			}
 
+			//matrice interferenza
+			interference.resize(totalPotentialNodes);
+			for(unsigned int i = 0; i < interference.size(); i++)
+			{
+				interference[i].resize(totalPotentialNodes,-1);
+			}
+
 			success = createGrid();
 		}
 		catch (exception& e)
@@ -501,6 +589,22 @@ static void randomizeDeployCost(double minVal, double maxVal)
 
 }
 
+static void buildInterferenceMatrix()
+{
+	//stima statica delle interferenze basata sul modello di Shadowing di ns-2
+	for(unsigned int i = 0; i < interference.size(); i++)
+	{
+		for(unsigned int j = 0; j < interference[0].size(); j++)
+		{
+			if(i != j)
+			{
+				interference[i][j]= getInterferenceCoef(i,j); 
+				//cout << i << " " <<j <<"(" << mapGrid[i].x << "," << mapGrid[i].y << ")" << "(" << mapGrid[j].x << "," << mapGrid[j].y << ")" << getDistance(mapGrid[i].x,mapGrid[i].y,mapGrid[j].x,mapGrid[j].y) << " " << interference[i][j] << endl;
+			}
+		}
+	}
+}
+
 static int createRandomInstance(int users, int drones, int tInf, int tSup, double cInf, double cSup, double dInf, double dSup, int gridLength, int gridHeight, int gridStep, string filename)
 {
 	int result=0;
@@ -536,8 +640,19 @@ static int createRandomInstance(int users, int drones, int tInf, int tSup, doubl
 				randomizeTraffic(tInf,tSup);
 				randomizeCosts(cInf,cSup,nodeRadius);
 				randomizeDeployCost(dInf,dSup);
+				buildInterferenceMatrix(); //richiede griglia e utenti gia' posizionati
 
-				convertIntoBMatrix();
+				convertIntoBMatrix(); 
+
+				/*for(unsigned int i=0; i< interference.size(); i++) //debug
+				{
+					for(int j=0; j< interference[0].size(); j++)
+					{
+						cout << interference[i][j] << " ";
+					}
+					cout << endl;
+				}*/
+
 				saveInstance(filename.c_str());
 			}
 			else
@@ -671,6 +786,17 @@ int saveInstance(const char *filename)
 				file << mapGrid[i].y << endl;
 			}
 
+			//matrice interferenza
+			cout << endl << "Saved interference matrix:" << endl;
+			for(unsigned int i = 0; i < interference.size(); i++)
+			{
+				for(unsigned int j = 0; j < interference[0].size(); j++)
+				{
+					file << interference[i][j] << " "; 
+				}
+				file << endl;
+			}
+
 			file.close();
 			cout << "Creato file: " << filename << endl;
 		}
@@ -769,6 +895,24 @@ int loadInstance(const char *filename)
 						file >> mapGrid[index].y;
 					}
 
+					//matrice interferenza
+					for(unsigned int i = 0; i < interference.size(); i++)
+					{
+						for(unsigned int j = 0; j < interference[0].size(); j++)
+						{
+							file >> interference[i][j]; 
+						}
+					}
+
+					/*cout << endl << "Loaded int matrix: " << endl;
+					for(unsigned int i=0; i< interference.size(); i++) //debug
+					{
+						for(int j=0; j< interference[0].size(); j++)
+						{
+							cout << interference[i][j] << " ";
+						}
+						cout << endl;
+					}*/
 					//debug
 					/*std::map<int,nodesCoordinates_t>::iterator it = mapGrid.begin();
 					for (it=mapGrid.begin(); it!=mapGrid.end(); ++it)

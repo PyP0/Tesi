@@ -13,8 +13,6 @@
 #include "lpsolver.h"
 #include "getRSS.h"
 
-#include "radiopropmodel.h"
-
 
 using namespace std;
 
@@ -63,14 +61,26 @@ solution_t *executeInstance(string fileName, bool verbose, int contRelax[])
 	DECL_ENV(env);
 	DECL_PROB(env, lp);
 
-	if(CPXsetintparam(env, CPX_PARAM_DATACHECK, 1) != 0) 
+	/*if(CPXsetintparam(env, CPX_PARAM_DATACHECK, 1) != 0) 
 		cerr << __FUNCTION__ << "(): 1 Impossibile settare uno o piu' parametri di CPLEX." << endl;
 	
 	if(CPXsetintparam(env, CPX_PARAM_CONFLICTDISPLAY, 2) != 0) 
 		cerr << __FUNCTION__ << "(): 2 Impossibile settare uno o piu' parametri di CPLEX." << endl;
+
+	if(CPXsetintparam(env, CPX_PARAM_MEMORYEMPHASIS, 1) != 0) 
+		cerr << __FUNCTION__ << "(): 3 Impossibile settare uno o piu' parametri di CPLEX." << endl;
+
+	if(CPXsetintparam(env, CPX_PARAM_NODEFILEIND, 3) != 0) 
+		cerr << __FUNCTION__ << "(): 4 Impossibile settare uno o piu' parametri di CPLEX." << endl;
+
+	if(CPXsetdblparam(env, CPX_PARAM_TRELIM, 16384.0 ) != 0) //16GB
+		cerr << __FUNCTION__ << "(): 4 Impossibile settare uno o piu' parametri di CPLEX." << endl;*/
+
+
+	//CPXwriteparam (env, "CPLEXparams.prm");
 	
-	//if ( CPXreadcopyparam(env, "CPLEXparams.prm") != 0)
-	//	cerr << __FUNCTION__ << "(): Impossibile leggere i parametri CPLEX dal file di configurazione, si usera' la configurazione standard." << endl;
+	if ( CPXreadcopyparam(env, "CPLEXparams.prm") != 0)
+		cerr << __FUNCTION__ << "(): Impossibile leggere i parametri CPLEX dal file di configurazione, si usera' la configurazione standard." << endl;
 	
 	string baseFileName (fileName);
 	string instance = baseFileName;
@@ -155,7 +165,7 @@ solution_t *executeInstance(string fileName, bool verbose, int contRelax[])
 
 int executeMaster(vector< string > fileList, string masterSolutionsFile, bool verbose, int contRelax[])
 {
-	int globalStatus = 0;
+	int globalStatus = 0; 
 	solution_t *instSolution = NULL;
 	ofstream file;
 	if(fileList.size() > 0)
@@ -224,12 +234,12 @@ int main(int argc, char const *argv[])
 	{
 		//int instQuantity, vector<int> users, vector<int> drones, vector<int> gridLength, vector<int> gridHeight, vector<int> gridStep, int tInf, int tSup, double cInf, double cSup, double dInf, double dSup, string instRootName)
 		createBatchInstances(
-			1, //instQuantity
+			20, //instQuantity
 			vector<int> {5}, //users
 			vector<int> {20}, //drones
-			vector<int> {5}, //gridLength
-			vector<int> {10},  //gridHeight
-			vector<int> {2},  //gridStep
+			vector<int> {5,10,10}, //gridLength
+			vector<int> {5,5,10},  //gridHeight
+			vector<int> {2,2,2},  //gridStep
 			0, 	//tInf
 			30, //tSup
 			5,	//cInf
@@ -249,7 +259,13 @@ int main(int argc, char const *argv[])
 		if(string(argv[1]).compare(string("-t")) == 0) //test branch
 		{
 
-			shadowingTest(10000,1.02802e-10); 
+			//shadowingTest(10000,1.02802e-10); 
+			cout << endl << "Shadowing model test: " << endl;
+			shadowingTest(10000); 
+
+			cout << endl << "interference model test: " << endl;
+			interferenceModelTest();
+			
 			return 0;
 		}
 		
