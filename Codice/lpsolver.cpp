@@ -314,7 +314,382 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 	double bigM = 0.0;
 	
 
-	// 1
+	// Test pre euristica: y_i >= 1
+
+	/*sense = 'G';
+	matbeg = 0;
+	idx.clear();
+	coef.clear();
+	idx.push_back(y_index + 10 - getUsrsNum());
+	coef.push_back(1.0);
+
+	snprintf(name, NAME_SIZE, "cY_%d", rowNumber); //numerazione progressiva dei vincoli
+	char* rowname_ = (char*)(&name[0]);
+	rowNumber++;
+
+	CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idx.size(), &uno, &sense, &matbeg, &idx[0], &coef[0], NULL, &rowname_);
+	idx.clear();
+	coef.clear();
+	
+	//
+	
+	idx.push_back(y_index + 13 - getUsrsNum());
+	coef.push_back(1.0);
+
+	snprintf(name, NAME_SIZE, "cY_%d", rowNumber); //numerazione progressiva dei vincoli
+	rowname_ = (char*)(&name[0]);
+	rowNumber++;
+
+	CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idx.size(), &uno, &sense, &matbeg, &idx[0], &coef[0], NULL, &rowname_);
+	idx.clear();
+	coef.clear();
+
+	//
+
+	idx.push_back(y_index + 15 - getUsrsNum());
+	coef.push_back(1.0);
+
+	snprintf(name, NAME_SIZE, "cY_%d", rowNumber); //numerazione progressiva dei vincoli
+	rowname_ = (char*)(&name[0]);
+	rowNumber++;
+
+	CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idx.size(), &uno, &sense, &matbeg, &idx[0], &coef[0], NULL, &rowname_);
+	idx.clear();
+	coef.clear();
+
+	//
+
+	idx.push_back(y_index + 20 - getUsrsNum());
+	coef.push_back(1.0);
+
+	snprintf(name, NAME_SIZE, "cY_%d", rowNumber); //numerazione progressiva dei vincoli
+	rowname_ = (char*)(&name[0]);
+	rowNumber++;
+
+	CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idx.size(), &uno, &sense, &matbeg, &idx[0], &coef[0], NULL, &rowname_);
+	idx.clear();
+	coef.clear();
+
+	//
+
+	idx.push_back(y_index + 23 - getUsrsNum());
+	coef.push_back(1.0);
+
+	snprintf(name, NAME_SIZE, "cY_%d", rowNumber); //numerazione progressiva dei vincoli
+	rowname_ = (char*)(&name[0]);
+	rowNumber++;
+
+	CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idx.size(), &uno, &sense, &matbeg, &idx[0], &coef[0], NULL, &rowname_);
+	idx.clear();
+	coef.clear();*/
+
+	// 1. conservazione flusso (8)
+	sense = 'E';
+	matbeg = 0;
+	coef.clear();
+	idx.clear();
+	for (int v = 0; v < getTotalPotentialNodes(); v++)
+	{
+		for (int k = 0; k < getCommsNum(); k++)
+		{
+			for (int i = 0; i < getTotalPotentialNodes(); i++)
+			{
+				//if (i != v && graph[i][v] != 0)
+				//if (i != v && !(v < n && i < n)) //condizione più generale, include le fijk di nodi tra cui non ci sono link
+				if (i != v && fMap[i][v][k] != -1) //*** a meno della presenza di nodi isolati, ci sarà per ogni vincolo almeno una coppia di f tc fmap[][][]!=-1
+				{
+					idx.push_back(fMap[i][v][k]);
+					coef.push_back(1.0);
+				}
+			}
+
+			for (int j = 0; j < getTotalPotentialNodes(); j++)
+			{
+				//if (v != j && graph[v][j] != 0)
+				if (v != j && fMap[v][j][k] != -1) //***condizione più generale, include le fijv di nodi tra cui non ci sono link
+				{
+					idx.push_back(fMap[v][j][k]);
+					coef.push_back(-1.0);
+				}
+			}
+
+			snprintf(name, NAME_SIZE, "c1_%d", rowNumber); //numerazione progressiva dei vincoli
+			char* rowname = (char*)(&name[0]);
+			rowNumber++;
+
+
+			CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idx.size(), &b[v][k], &sense, &matbeg, &idx[0], &coef[0], NULL, &rowname);
+			idx.clear();
+			coef.clear();
+
+		}
+	}
+	//cout << "Vincoli (8) creati\n";
+
+	// 2. vers 1.0  Sum(f_ijk) <= M * x_ij (12)
+	//bigM = max(getRXCapacity(),getTXCapacity()); 
+
+	//set the big M value for each specific constraint
+	bigM = 0;
+	for(int i = 0; i < getUsrsNum(); i++)
+	{
+		for(int j = 0; j < getUsrsNum(); j++)
+		{
+			if(i != j)
+			{
+				int trf = getRequestedTraffic(i,j);
+				if(trf > 0)
+					bigM += trf;  //total bigM = sum of total traffic matrix
+			}
+		}
+	}
+	bigM += 1;
+
+
+	sense = 'L';
+	matbeg = 0;
+	idx.clear();
+	coef.clear();
+	for (int i = 0; i < getTotalPotentialNodes(); i++)
+	{
+		for (int j = 0; j < getTotalPotentialNodes(); j++)
+		{
+			//if (i != j) ***
+			//{
+			//if (!(j < n && i < n)) //esclude i link i cui estremi sono entrambi nodi utenti //***
+			//{
+			for (int k = 0; k < getCommsNum(); k++)
+			{
+				if (i != j && fMap[i][j][k] != -1) //***
+				{
+					idx.push_back(fMap[i][j][k]);
+					coef.push_back(1.0);
+				}
+			}
+			// f_i_j_k - M * x_i_j
+			if(coef.size() > 0)
+			{
+				idx.push_back(xMap[i][j]);
+				coef.push_back(-bigM);
+
+				snprintf(name, NAME_SIZE, "c2_%d", rowNumber); //numerazione progressiva dei vincoli
+				char* rowname = (char*)(&name[0]);
+				rowNumber++;
+	
+				CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idx.size(), &zero, &sense, &matbeg, &idx[0], &coef[0], NULL, &rowname);
+			}
+			idx.clear();
+			coef.clear();
+		}
+	}
+
+	// 2. Legame tra le variabili f_i_j_k e y_i
+
+	//vers. 1.1
+	//2.a
+	/*bigM = max(getRXCapacity(),getTXCapacity()); //set the big M value for each specific constraint
+	sense = 'L';
+	matbeg = 0;
+	idx.clear();
+	coef.clear();
+
+	for (int i = getUsrsNum(); i < getTotalPotentialNodes(); i++) // P
+	{
+		for (int j = 0; j < getTotalPotentialNodes(); j++) // V'
+		{
+			//if (!(j < n && i < n)) //esclude i link i cui estremi sono entrambi nodi utenti //***
+			for (int k = 0; k < getCommsNum(); k++)
+			{
+				if (i != j && fMap[i][j][k] != -1) //***
+				{
+					//f_i_j_k - My_i
+					idx.push_back(fMap[i][j][k]);
+					coef.push_back(1.0);
+
+					idx.push_back(y_index + i - getUsrsNum());
+					coef.push_back(-bigM);
+
+					snprintf(name, NAME_SIZE, "c12_%d", rowNumber); //numerazione progressiva dei vincoli
+					char* rowname = (char*)(&name[0]);
+					rowNumber++;
+	
+					CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idx.size(), &zero, &sense, &matbeg, &idx[0], &coef[0], NULL, &rowname);
+					idx.clear();
+					coef.clear();
+				}
+			}
+		}
+	}
+
+	//2.b
+	for (int i = 0; i < getTotalPotentialNodes(); i++) // V'
+	{
+		for (int j = getUsrsNum(); j < getTotalPotentialNodes(); j++) // P
+		{
+			//if (!(j < n && i < n)) //esclude i link i cui estremi sono entrambi nodi utenti //***
+			for (int k = 0; k < getCommsNum(); k++)
+			{
+				if (i != j && fMap[i][j][k] != -1) //***
+				{
+					//f_i_j_k - My_j
+					idx.push_back(fMap[i][j][k]);
+					coef.push_back(1.0);
+
+					idx.push_back(y_index + j - getUsrsNum());
+					coef.push_back(-bigM);
+
+					snprintf(name, NAME_SIZE, "c12_%d", rowNumber); //numerazione progressiva dei vincoli
+					char* rowname = (char*)(&name[0]);
+					rowNumber++;
+	
+					CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idx.size(), &zero, &sense, &matbeg, &idx[0], &coef[0], NULL, &rowname);
+					idx.clear();
+					coef.clear();
+				}
+			}
+		}
+	}*/
+
+	// 2. ver 1.1 AGGREGATA
+	//2.a
+	/*bigM = max(getRXCapacity(),getTXCapacity()); //set the big M value for each specific constraint
+	sense = 'L';
+	matbeg = 0;
+	idx.clear();
+	coef.clear();
+
+	for (int i = getUsrsNum(); i < getTotalPotentialNodes(); i++) // P
+	{
+		for (int j = 0; j < getTotalPotentialNodes(); j++) // V'
+		{
+			for (int k = 0; k < getCommsNum(); k++)
+			{
+				if (i != j && fMap[i][j][k] != -1) //***
+				{
+					//SUM(f_i_j_k)
+					idx.push_back(fMap[i][j][k]);
+					coef.push_back(1.0);
+				}
+			}
+
+			if(coef.size() > 0)
+			{
+				// M*y_i
+				idx.push_back(y_index + i - getUsrsNum());
+				coef.push_back(-bigM);
+
+				snprintf(name, NAME_SIZE, "c12_%d", rowNumber); //numerazione progressiva dei vincoli
+				char* rowname = (char*)(&name[0]);
+				rowNumber++;
+		
+				CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idx.size(), &zero, &sense, &matbeg, &idx[0], &coef[0], NULL, &rowname);
+				idx.clear();
+				coef.clear();
+			}
+		}
+	}
+
+	//2.b
+	for (int i = 0; i < getTotalPotentialNodes(); i++) // V'
+	{
+		for (int j = getUsrsNum(); j < getTotalPotentialNodes(); j++) // P
+		{
+			for (int k = 0; k < getCommsNum(); k++)
+			{
+				if (i != j && fMap[i][j][k] != -1) //***
+				{
+					//SUM(f_i_j_k)
+					idx.push_back(fMap[i][j][k]);
+					coef.push_back(1.0);
+				}
+			}
+
+			if(coef.size() > 0)
+			{
+				idx.push_back(y_index + j - getUsrsNum());
+				coef.push_back(-bigM);
+
+				snprintf(name, NAME_SIZE, "c12a_%d", rowNumber); //numerazione progressiva dei vincoli
+				char* rowname = (char*)(&name[0]);
+				rowNumber++;
+	
+				CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idx.size(), &zero, &sense, &matbeg, &idx[0], &coef[0], NULL, &rowname);
+				idx.clear();
+				coef.clear();
+				
+			}
+		}
+	}*/
+	//cout << "Vincoli (12) creati\n" << endl;
+
+
+	// 3. legame tra variabili x_i_j e y_j (9)
+	sense = 'L';
+	matbeg = 0;
+	coef.clear();
+	idx.clear();
+	for (int j = getUsrsNum(); j < getTotalPotentialNodes(); j++)
+	{
+		for (int i = 0; i < getTotalPotentialNodes(); i++)
+		{
+			//if (i != j && graph[i][j] != 0)
+			//if (i != j && xMap[i][j] != -1) //***
+			if (i != j && xMap[i][j] != -1 && xMap[j][i] != -1) //***
+			{
+				//add x_i_j
+				idx.push_back(xMap[i][j]);
+				coef.push_back(1.0);
+
+				//add -y_j
+				idx.push_back(y_index + (j - getUsrsNum()));
+				coef.push_back(-1.0);
+
+				snprintf(name, NAME_SIZE, "c3_%d", rowNumber); //numerazione progressiva dei vincoli
+				char* rowname = (char*)(&name[0]);
+				rowNumber++;
+
+				CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idx.size(), &zero, &sense, &matbeg, &idx[0], &coef[0], NULL, &rowname);
+
+				//add x_j_i
+				idx[0] = xMap[j][i];
+				
+
+				snprintf(name, NAME_SIZE, "c3a_%d", rowNumber); //numerazione progressiva dei vincoli
+				rowname = (char*)(&name[0]);
+				rowNumber++;
+
+				CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idx.size(), &zero, &sense, &matbeg, &idx[0], &coef[0], NULL, &rowname);
+				idx.clear();
+				coef.clear();
+			}
+		}
+	}
+
+	//cout << "Vincoli (9) creati\n";
+
+	// 4. non posizionare piu' di d droni (11)
+	double temp_d = (double)getDrnsNum();
+	sense = 'L';
+	matbeg = 0;
+	coef.clear();
+	idx.clear();
+	for (int i = 0; i < getTotalPotentialNodes() - getUsrsNum(); i++)
+	{
+		idx.push_back(y_index + i);
+		coef.push_back(1.0);
+	}
+
+	snprintf(name, NAME_SIZE, "c4_%d", rowNumber); //numerazione progressiva dei vincoli
+	char* rowname = (char*)(&name[0]);
+	rowNumber++;
+
+	CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idx.size(), &temp_d, &sense, &matbeg, &idx[0], &coef[0], NULL, &rowname);
+	idx.clear();
+	coef.clear();
+
+	//cout << "Vincoli (11) creati\n";
+
+	// 5.  Sum(f_jik) <= U_rx * y_i - s_i  (1)
 	sense = 'L'; 
 	matbeg = 0;
 	coef.clear();
@@ -342,7 +717,7 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 		idx.push_back(s_index + i);
 		coef.push_back(1.0);
 
-		snprintf(name, NAME_SIZE, "c1_%d", rowNumber); //numerazione progressiva dei vincoli
+		snprintf(name, NAME_SIZE, "c5_%d", rowNumber); //numerazione progressiva dei vincoli
 		char* rowname = (char*)(&name[0]);
 		rowNumber++;
 
@@ -352,7 +727,7 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 	}	
 	//cout << "Vincoli (1) creati\n";
 
-	// 1.a
+	// 5.a Sum(f_jik) <= U_rx - s_i
 
 	sense = 'L'; 
 	matbeg = 0;
@@ -379,7 +754,7 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 		idx.push_back(s_index + i);
 		coef.push_back(1.0);
 
-		snprintf(name, NAME_SIZE, "c1_%d", rowNumber); //numerazione progressiva dei vincoli
+		snprintf(name, NAME_SIZE, "c5.a_%d", rowNumber); //numerazione progressiva dei vincoli
 		char* rowname = (char*)(&name[0]);
 		rowNumber++;
 
@@ -390,7 +765,7 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 	}
 	//cout << "Vincoli (1.a) creati\n";
 
-	// 2
+	// 6. s_i >= S_max * z_i (2)
 
 	sense = 'G'; 
 	matbeg = 0;
@@ -407,19 +782,7 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 		idx.push_back(z_index + i);
 		coef.push_back(-reductionFactor);
 
-		//1.1 TODO: test per relazionare le zi con le yi
-		// M(1-y_i)
-		/*if( i >= getUsrsNum()) // P
-		{
-			bigM = 2 * reductionFactor;
-			// - M(1-y_i)
-			idx.push_back(y_index + i -getUsrsNum());
-			coef.push_back(-bigM);
-			rhs = - bigM;
-
-		}*/
-
-		snprintf(name, NAME_SIZE, "c2_%d", rowNumber); //numerazione progressiva dei vincoli
+		snprintf(name, NAME_SIZE, "c6_%d", rowNumber); //numerazione progressiva dei vincoli
 		char* rowname = (char*)(&name[0]);
 		rowNumber++;
 
@@ -429,349 +792,10 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 		coef.clear();
 	}
 	//cout << "Vincoli (2) creati\n";
-	
-	//1.1 TODO: test
-	//2.b
-	/*sense = 'L';  
-	matbeg = 0;
-	coef.clear();
-	idx.clear();
-	for( int i = 0; i < getTotalPotentialNodes(); i++)  // V'
-	{
-		// sconto
-		idx.push_back(s_index + i);
-		coef.push_back(1.0);
 
-		snprintf(name, NAME_SIZE, "c2_%d", rowNumber); //numerazione progressiva dei vincoli
-		char* rowname = (char*)(&name[0]);
-		rowNumber++;
+	// 7. vers. 1.0 aggregata (6)
 
-
-		CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idx.size(), &reductionFactor, &sense, &matbeg, &idx[0], &coef[0], NULL, &rowname);
-		idx.clear();
-		coef.clear();
-	}*/
-
-	// 3
-
-	bigM = 2 * reductionFactor; //set the big M value for each specific constraint
-	sense = 'G'; 
-	matbeg = 0;
-	coef.clear();
-	idx.clear();
-
-	
-	for( int i = getUsrsNum(); i < getTotalPotentialNodes(); i++) // P
-	{
-		double rhs = 0;
-
-		// sconto_i
-		idx.push_back(s_index + i);
-		coef.push_back(1.0);
-
-		// sum Aji * y_j su P
-		for(int j = getUsrsNum(); j < getTotalPotentialNodes(); j++) // P
-		{
-			double distance = getDistance(mapGrid[i].x, mapGrid[i].y, mapGrid[j].x, mapGrid[j].y);
-			if(i != j && distance > getEpsilonNodeRadius() && distance <= getNodeRadius()) //R_epsilon excluded
-			{
-				idx.push_back(y_index + j - getUsrsNum());
-				//cout << "passo j,i : " << j << " " << i << endl;
-				coef.push_back(-getInterference(j,i));
-			}
-		}
-
-		// sum Aji * y_j su V
-
-		for(int j = 0; j < getUsrsNum(); j++) // V
-		{
-			double distance = getDistance(mapGrid[i].x, mapGrid[i].y, mapGrid[j].x, mapGrid[j].y);
-			if(i != j && distance > getEpsilonNodeRadius() && distance <= getNodeRadius()) //R_epsilon excluded
-			{
-				rhs+= getInterference(j,i);
-			}
-		}
-
-		// -M(supera_i + 1 - y_i)
-
-		idx.push_back(supera_index + i);
-		coef.push_back(bigM);
-
-
-		rhs-= bigM;
-
-		idx.push_back(y_index + i - getUsrsNum());
-		coef.push_back(- bigM);
-
-
-		snprintf(name, NAME_SIZE, "c3_%d", rowNumber); //numerazione progressiva dei vincoli
-		char* rowname = (char*)(&name[0]);
-		rowNumber++;
-
-		CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idx.size(), &rhs, &sense, &matbeg, &idx[0], &coef[0], NULL, &rowname);
-		idx.clear();
-		coef.clear();
-	}
-	//cout << "Vincoli (3) creati\n";
-
-	// 3.a
-
-	bigM = 2 * reductionFactor; //set the big M value for each specific constraint
-	sense = 'G'; 
-	matbeg = 0;
-	coef.clear();
-	idx.clear();
-	
-	for( int i = 0; i < getUsrsNum(); i++) // V
-	{
-		// sconto_i
-		idx.push_back(s_index + i);
-		coef.push_back(1.0);
-
-		// sum Aji * y_j su P
-		for(int j = getUsrsNum(); j < getTotalPotentialNodes(); j++) // P
-		{
-			double distance = getDistance(mapGrid[i].x, mapGrid[i].y, mapGrid[j].x, mapGrid[j].y);
-			if(i != j && distance > getEpsilonNodeRadius() && distance <= getNodeRadius()) //R_epsilon excluded
-			{
-				idx.push_back(y_index + j - getUsrsNum());
-				coef.push_back(-getInterference(j,i));
-			}
-		}
-
-		// -M(supera_i)
-
-		idx.push_back(supera_index + i);
-		coef.push_back(bigM);
-
-		snprintf(name, NAME_SIZE, "c3a_%d", rowNumber); //numerazione progressiva dei vincoli
-		char* rowname = (char*)(&name[0]);
-		rowNumber++;
-
-
-		CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idx.size(), &zero, &sense, &matbeg, &idx[0], &coef[0], NULL, &rowname);
-		idx.clear();
-		coef.clear();
-	}
-	//cout << "Vincoli (3.a) creati\n";
-
-	// 4 
-
-	bigM = 2 * reductionFactor; //set the big M value for each specific constraint
-	sense = 'L'; 
-	matbeg = 0;
-	coef.clear();
-	idx.clear();
-
-	for(int i = getUsrsNum(); i < getTotalPotentialNodes(); i++)  // P
-	{
-		double rhs = 0;
-
-		// sum Aji * y_j su P
-		for(int j = getUsrsNum(); j < getTotalPotentialNodes(); j++)  // P
-		{
-			double distance = getDistance(mapGrid[i].x, mapGrid[i].y, mapGrid[j].x, mapGrid[j].y);
-			if(i != j && distance > getEpsilonNodeRadius() && distance <= getNodeRadius()) //R_epsilon excluded
-			{
-				idx.push_back(y_index + j - getUsrsNum());
-				coef.push_back(getInterference(j,i));
-			}
-		}
-
-		// sum Aji su V
-
-		for(int j = 0; j < getUsrsNum(); j++) // V
-		{
-			double distance = getDistance(mapGrid[i].x, mapGrid[i].y, mapGrid[j].x, mapGrid[j].y);
-			if(i != j && distance > getEpsilonNodeRadius() && distance <= getNodeRadius()) //R_epsilon excluded
-			{
-				rhs-= getInterference(j,i);
-			}
-		}
-
-		rhs+= reductionFactor;
-
-		// M(supera_i + 1 - y_i)
-
-		idx.push_back(supera_index + i);
-		coef.push_back(-bigM);
-
-		rhs+= bigM;
-
-		idx.push_back(y_index + i - getUsrsNum());
-		coef.push_back( bigM);
-
-
-		snprintf(name, NAME_SIZE, "c4_%d", rowNumber); //numerazione progressiva dei vincoli
-		char* rowname = (char*)(&name[0]);
-		rowNumber++;
-
-		CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idx.size(), &rhs, &sense, &matbeg, &idx[0], &coef[0], NULL, &rowname);
-		idx.clear();
-		coef.clear();
-
-	}
-	//cout << "Vincoli (4) creati\n";
-
-	// 4.a 
-
-	bigM = 2 * reductionFactor; //set the big M value for each specific constraint
-	sense = 'L'; 
-	matbeg = 0;
-	coef.clear();
-	idx.clear();
-
-	for(int i = 0; i < getUsrsNum(); i++)  // V
-	{
-		double rhs = 0;
-
-		// sum Aji * y_j su P
-		for(int j = getUsrsNum(); j < getTotalPotentialNodes(); j++)  // P
-		{
-			double distance = getDistance(mapGrid[i].x, mapGrid[i].y, mapGrid[j].x, mapGrid[j].y);
-			if(i != j && distance > getEpsilonNodeRadius() && distance <= getNodeRadius()) //R_epsilon excluded
-			{
-				idx.push_back(y_index + j - getUsrsNum());
-				coef.push_back(getInterference(j,i));
-			}
-		}
-
-
-		rhs= reductionFactor;
-
-		// M(supera_i)
-
-		idx.push_back(supera_index + i);
-		coef.push_back(-bigM);
-
-		//rhs+= bigM;
-		//idx.push_back(y_index + i);
-		//coef.push_back( bigM);
-
-		snprintf(name, NAME_SIZE, "c4a_%d", rowNumber); //numerazione progressiva dei vincoli
-		char* rowname = (char*)(&name[0]);
-		rowNumber++;
-
-		CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idx.size(), &rhs, &sense, &matbeg, &idx[0], &coef[0], NULL, &rowname);
-		idx.clear();
-		coef.clear();
-
-	}
-	//cout << "Vincoli (4.a) creati\n";
-
-	// 5 
-
-	bigM = 2 * reductionFactor; //set the big M value for each specific constraint
-	sense = 'G';
-	matbeg = 0;
-	coef.clear();
-	idx.clear();
-	
-	for(int i = getUsrsNum(); i < getTotalPotentialNodes(); i++) // P
-	{
-		double rhs = 0;
-		
-		// sconto_i
-		idx.push_back(s_index + i);
-		coef.push_back(1.0);
-
-		// sconto * supera_i
-		idx.push_back(supera_index + i);
-		coef.push_back(-reductionFactor);
-
-		// -M(1-y_i)
-		rhs-= bigM;
-
-		idx.push_back(y_index + i - getUsrsNum());
-		coef.push_back(-bigM);
-
-		snprintf(name, NAME_SIZE, "c5_%d", rowNumber); //numerazione progressiva dei vincoli
-		char* rowname = (char*)(&name[0]);
-		rowNumber++;
-
-		CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idx.size(), &rhs, &sense, &matbeg, &idx[0], &coef[0], NULL, &rowname);
-		idx.clear();
-		coef.clear();
-	}
-
-	//1.1 TODO: test rimozione -M(...)
-	/*for(int i = getUsrsNum(); i < getTotalPotentialNodes(); i++) // P
-	{
-		// sconto_i
-		idx.push_back(s_index + i);
-		coef.push_back(1.0);
-
-		// sconto * supera_i
-		idx.push_back(supera_index + i);
-		coef.push_back(-reductionFactor);
-
-		snprintf(name, NAME_SIZE, "c5_%d", rowNumber); //numerazione progressiva dei vincoli
-		char* rowname = (char*)(&name[0]);
-		rowNumber++;
-
-		CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idx.size(), &zero, &sense, &matbeg, &idx[0], &coef[0], NULL, &rowname);
-		idx.clear();
-		coef.clear();
-	}*/
-	//cout << "Vincoli (5) creati\n";
-
-	// 5.a
-
-	sense = 'G';  
-	matbeg = 0;
-	coef.clear();
-	idx.clear();
-
-	for(int i = 0; i < getUsrsNum(); i++)  // V
-	{
-		// sconto_i
-		idx.push_back(s_index + i);
-		coef.push_back(1.0);
-
-		// sconto * supera_i
-		idx.push_back(supera_index + i);
-		coef.push_back(-reductionFactor);
-
-		snprintf(name, NAME_SIZE, "c5_%d", rowNumber); //numerazione progressiva dei vincoli
-		char* rowname = (char*)(&name[0]);
-		rowNumber++;
-
-		CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idx.size(), &zero, &sense, &matbeg, &idx[0], &coef[0], NULL, &rowname);
-		idx.clear();
-		coef.clear();
-	}
-	//cout << "Vincoli (5.a) creati\n";
-
-	
-	//1.1 TODO: test  IF_si >= smax THEN_spi=1-y_i
-	// 5.b
-	/*bigM = 2 * reductionFactor; //set the big M value for each specific constraint
-	sense = 'L'; 
-	matbeg = 0;
-	coef.clear();
-	idx.clear();
-	for(int i = 0; i < getTotalPotentialNodes(); i++) // V'
-	{
-		double epsilon = 0.0001 ; 
-		double rhs = reductionFactor - epsilon;
-		idx.push_back(s_index + i);
-		coef.push_back(1.0);
-		
-		idx.push_back(supera_index + i);
-		coef.push_back(-bigM);
-		
-		snprintf(name, NAME_SIZE, "c5_%d", rowNumber); //numerazione progressiva dei vincoli
-		char* rowname = (char*)(&name[0]);
-		rowNumber++;
-
-		CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idx.size(), &rhs, &sense, &matbeg, &idx[0], &coef[0], NULL, &rowname);
-		idx.clear();
-		coef.clear();
-	}*/
-	
-	// 6. vers. 1.0 aggregata
-
-	/*bigM = 2 * getTotalPotentialNodes(); //set the big M value for each specific constraint
+	//bigM = 2 * getTotalPotentialNodes(); 
 	matbeg = 0;
 	coef.clear();
 	idx.clear();
@@ -806,6 +830,7 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 
 			if(coef.size() > 0)
 			{
+				bigM = min( (int)coef.size() + 5, getTotalPotentialNodes() + 5 ); //set the big M value for each specific constraint
 				// M(z_i + 1 - y_i)
 
 				idx.push_back(z_index + i);
@@ -816,7 +841,7 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 				idx.push_back(y_index + i - getUsrsNum());
 				coef.push_back(bigM);
 
-				snprintf(name, NAME_SIZE, "c6_%d", rowNumber); //numerazione progressiva dei vincoli
+				snprintf(name, NAME_SIZE, "c7_%d", rowNumber); //numerazione progressiva dei vincoli
 				char* rowname = (char*)(&name[0]);
 				rowNumber++;
 
@@ -840,7 +865,7 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 			idx.push_back(y_index + i - getUsrsNum());
 			coef.push_back(-1.0);
 
-			snprintf(name, NAME_SIZE, "c6_%d", rowNumber); //numerazione progressiva dei vincoli
+			snprintf(name, NAME_SIZE, "c7_%d", rowNumber); //numerazione progressiva dei vincoli
 			char* rowname = (char*)(&name[0]);
 			rowNumber++;
 
@@ -851,8 +876,8 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 	}
 	
 	
-	// TODO: test
-	bigM = 5*getTotalPotentialNodes(); //set the big M value for each specific constraint
+	//7.a TODO: test
+	//bigM = 2 * getTotalPotentialNodes(); //set the big M value for each specific constraint
 	sense = 'L'; 
 	matbeg = 0;
 	coef.clear();
@@ -870,10 +895,11 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 		}
 		if(coef.size() > 0)
 		{
+			bigM = min( (int)coef.size() + 5, getTotalPotentialNodes() + 5 ); //set the big M value for each specific constraint 
 			idx.push_back(z_index + i);
 			coef.push_back(-bigM);
 		
-			snprintf(name, NAME_SIZE, "c6_%d", rowNumber); //numerazione progressiva dei vincoli
+			snprintf(name, NAME_SIZE, "c7.a_%d", rowNumber); //numerazione progressiva dei vincoli
 			char* rowname = (char*)(&name[0]);
 			rowNumber++;
 
@@ -881,11 +907,11 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 			idx.clear();
 			coef.clear();
 		}
-	}*/
+	}
 
 
-	// 6. versione 1.1 non aggregata
-	matbeg = 0;
+	// 7. versione 1.1 non aggregata
+	/*matbeg = 0;
 	coef.clear();
 	idx.clear();
 	sense = 'G';
@@ -944,60 +970,385 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 			coef.clear();
 
 		}
-	}
+	}*/
 
 	//cout << "Vincoli (6) creati\n";
-	
-	//TODO: Test legame tra yi e spi
-	/*sense = 'G'; 
+
+	// 8. s_i >= Sum(A_ji * y_j) + Sum(A_ji) - M (sp_i + 1 - y_i)   (3)
+
+	//bigM = 2 * reductionFactor; //set the big M value for each specific constraint
+	sense = 'G'; 
 	matbeg = 0;
 	coef.clear();
 	idx.clear();
-	for(int i = getUsrsNum(); i < getTotalPotentialNodes(); i++) // P
+
+	for( int i = getUsrsNum(); i < getTotalPotentialNodes(); i++) // P
 	{
-		idx.push_back(y_index + i - getUsrsNum());
+		double rhs = 0;
+		int bigMMultiplyCounter = 0;
+		// sconto_i
+		idx.push_back(s_index + i);
 		coef.push_back(1.0);
 
+		// sum Aji * y_j su P
+		for(int j = getUsrsNum(); j < getTotalPotentialNodes(); j++) // P
+		{
+			double distance = getDistance(mapGrid[i].x, mapGrid[i].y, mapGrid[j].x, mapGrid[j].y);
+			if(i != j && distance > getEpsilonNodeRadius() && distance <= getNodeRadius()) //R_epsilon excluded
+			{
+				idx.push_back(y_index + j - getUsrsNum());
+				//cout << "passo j,i : " << j << " " << i << endl;
+				coef.push_back(-getInterference(j,i));
+
+				bigMMultiplyCounter++;
+			}
+		}
+
+		bigMMultiplyCounter = min(bigMMultiplyCounter+1, getDrnsNum());
+
+		// sum Aji * y_j su V
+
+		for(int j = 0; j < getUsrsNum(); j++) // V
+		{
+			double distance = getDistance(mapGrid[i].x, mapGrid[i].y, mapGrid[j].x, mapGrid[j].y);
+			if(i != j && distance > getEpsilonNodeRadius() && distance <= getNodeRadius()) //R_epsilon excluded
+			{
+				rhs+= getInterference(j,i);
+
+				bigMMultiplyCounter++;
+			}
+		}
+
+		bigM = bigMMultiplyCounter * reductionFactor; //set the big M value for each specific constraint
+		// -M(supera_i + 1 - y_i)
+
 		idx.push_back(supera_index + i);
-		coef.push_back(-1.0);
+		coef.push_back(bigM);
+
+
+		rhs-= bigM;
+
+		idx.push_back(y_index + i - getUsrsNum());
+		coef.push_back(- bigM);
+
+
+		snprintf(name, NAME_SIZE, "c8_%d", rowNumber); //numerazione progressiva dei vincoli
+		char* rowname = (char*)(&name[0]);
+		rowNumber++;
+
+		CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idx.size(), &rhs, &sense, &matbeg, &idx[0], &coef[0], NULL, &rowname);
+		idx.clear();
+		coef.clear();
+	}
+	//cout << "Vincoli (3) creati\n";
+
+
+	// 8.a si >= Sum(A_ji * y_j) - M * sp_i
+
+	//bigM = 2 * reductionFactor; //set the big M value for each specific constraint
+	sense = 'G'; 
+	matbeg = 0;
+	coef.clear();
+	idx.clear();
+	
+	for( int i = 0; i < getUsrsNum(); i++) // V
+	{
+		int bigMMultiplyCounter = 0;
+
+		// sconto_i
+		idx.push_back(s_index + i);
+		coef.push_back(1.0);
+
+		// sum Aji * y_j su P
+		for(int j = getUsrsNum(); j < getTotalPotentialNodes(); j++) // P
+		{
+			double distance = getDistance(mapGrid[i].x, mapGrid[i].y, mapGrid[j].x, mapGrid[j].y);
+			if(i != j && distance > getEpsilonNodeRadius() && distance <= getNodeRadius()) //R_epsilon excluded
+			{
+				idx.push_back(y_index + j - getUsrsNum());
+				coef.push_back(-getInterference(j,i));
+
+				bigMMultiplyCounter++;
+			}
+		}
+
+		bigMMultiplyCounter = min(bigMMultiplyCounter+1, getDrnsNum());
+		bigM = bigMMultiplyCounter * reductionFactor; //set the big M value for each specific constraint
+		// -M(supera_i)
+
+		idx.push_back(supera_index + i);
+		coef.push_back(bigM);
+
+		snprintf(name, NAME_SIZE, "c8a_%d", rowNumber); //numerazione progressiva dei vincoli
+		char* rowname = (char*)(&name[0]);
+		rowNumber++;
+
+
+		CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idx.size(), &zero, &sense, &matbeg, &idx[0], &coef[0], NULL, &rowname);
+		idx.clear();
+		coef.clear();
+	}
+	//cout << "Vincoli (3.a) creati\n";
+
+	// 9. Sum(A_ji * y_j) + Sum(A_ji) <= S_max + M (sp_i + 1 - y_i)   (4)
+
+	//bigM = 2 * reductionFactor; //set the big M value for each specific constraint
+	sense = 'L'; 
+	matbeg = 0;
+	coef.clear();
+	idx.clear();
+
+	for(int i = getUsrsNum(); i < getTotalPotentialNodes(); i++)  // P
+	{
+		double rhs = 0;
+		int bigMMultiplyCounter = 0;
+
+		// sum Aji * y_j su P
+		for(int j = getUsrsNum(); j < getTotalPotentialNodes(); j++)  // P
+		{
+			double distance = getDistance(mapGrid[i].x, mapGrid[i].y, mapGrid[j].x, mapGrid[j].y);
+			if(i != j && distance > getEpsilonNodeRadius() && distance <= getNodeRadius()) //R_epsilon excluded
+			{
+				idx.push_back(y_index + j - getUsrsNum());
+				coef.push_back(getInterference(j,i));
+
+				bigMMultiplyCounter++;
+			}
+		}
+
+		bigMMultiplyCounter = min(bigMMultiplyCounter+1, getDrnsNum());
+
+		// sum Aji su V
+
+		for(int j = 0; j < getUsrsNum(); j++) // V
+		{
+			double distance = getDistance(mapGrid[i].x, mapGrid[i].y, mapGrid[j].x, mapGrid[j].y);
+			if(i != j && distance > getEpsilonNodeRadius() && distance <= getNodeRadius()) //R_epsilon excluded
+			{
+				rhs-= getInterference(j,i);
+
+				bigMMultiplyCounter++; 
+			}
+		}
+
+		bigM = bigMMultiplyCounter * reductionFactor; //set the big M value for each specific constraint
+
+		rhs+= reductionFactor;
+
+		// M(supera_i + 1 - y_i)
+
+		idx.push_back(supera_index + i);
+		coef.push_back(-bigM);
+
+		rhs+= bigM;
+
+		idx.push_back(y_index + i - getUsrsNum());
+		coef.push_back( bigM);
+
+
+		snprintf(name, NAME_SIZE, "c9_%d", rowNumber); //numerazione progressiva dei vincoli
+		char* rowname = (char*)(&name[0]);
+		rowNumber++;
+
+		CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idx.size(), &rhs, &sense, &matbeg, &idx[0], &coef[0], NULL, &rowname);
+		idx.clear();
+		coef.clear();
+
+	}
+	//cout << "Vincoli (4) creati\n";
+
+	// 9.a Sum(A_ji * y_j) <= S_max + M * sp_i
+
+	//bigM = 2 * reductionFactor; //set the big M value for each specific constraint
+	sense = 'L'; 
+	matbeg = 0;
+	coef.clear();
+	idx.clear();
+
+	for(int i = 0; i < getUsrsNum(); i++)  // V
+	{
+		int bigMMultiplyCounter = 0;
+		double rhs = 0;
+
+		// sum Aji * y_j su P
+		for(int j = getUsrsNum(); j < getTotalPotentialNodes(); j++)  // P
+		{
+			double distance = getDistance(mapGrid[i].x, mapGrid[i].y, mapGrid[j].x, mapGrid[j].y);
+			if(i != j && distance > getEpsilonNodeRadius() && distance <= getNodeRadius()) //R_epsilon excluded
+			{
+				idx.push_back(y_index + j - getUsrsNum());
+				coef.push_back(getInterference(j,i));
+
+				bigMMultiplyCounter++;
+			}
+		}
+
+		bigMMultiplyCounter = min(bigMMultiplyCounter+1, getDrnsNum());
+		bigM = bigMMultiplyCounter * reductionFactor; //set the big M value for each specific constraint
+
+		rhs= reductionFactor;
+
+		// M(supera_i)
+
+		idx.push_back(supera_index + i);
+		coef.push_back(-bigM);
+
+		//rhs+= bigM;
+		//idx.push_back(y_index + i);
+		//coef.push_back( bigM);
+
+		snprintf(name, NAME_SIZE, "c9.a_%d", rowNumber); //numerazione progressiva dei vincoli
+		char* rowname = (char*)(&name[0]);
+		rowNumber++;
+
+		CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idx.size(), &rhs, &sense, &matbeg, &idx[0], &coef[0], NULL, &rowname);
+		idx.clear();
+		coef.clear();
+
+	}
+	//cout << "Vincoli (4.a) creati\n";
+
+	// 10. s_i >= S_max * sp_i - M(1 - y_i)  (5)
+
+	bigM = 2 * reductionFactor; //set the big M value for each specific constraint
+	sense = 'G';
+	matbeg = 0;
+	coef.clear();
+	idx.clear();
+	
+	for(int i = getUsrsNum(); i < getTotalPotentialNodes(); i++) // P
+	{
+		double rhs = 0;
 		
-		snprintf(name, NAME_SIZE, "c6_%d", rowNumber); //numerazione progressiva dei vincoli
+		// sconto_i
+		idx.push_back(s_index + i);
+		coef.push_back(1.0);
+
+		// sconto * supera_i
+		idx.push_back(supera_index + i);
+		coef.push_back(-reductionFactor);
+
+		// -M(1-y_i)
+		rhs-= bigM;
+
+		idx.push_back(y_index + i - getUsrsNum());
+		coef.push_back(-bigM);
+
+		snprintf(name, NAME_SIZE, "c10_%d", rowNumber); //numerazione progressiva dei vincoli
+		char* rowname = (char*)(&name[0]);
+		rowNumber++;
+
+		CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idx.size(), &rhs, &sense, &matbeg, &idx[0], &coef[0], NULL, &rowname);
+		idx.clear();
+		coef.clear();
+	}
+
+	//cout << "Vincoli (5) creati\n";
+
+	// 10.a   s_i >= S_max * sp_i
+
+	sense = 'G';  
+	matbeg = 0;
+	coef.clear();
+	idx.clear();
+
+	for(int i = 0; i < getUsrsNum(); i++)  // V
+	{
+		// sconto_i
+		idx.push_back(s_index + i);
+		coef.push_back(1.0);
+
+		// sconto * supera_i
+		idx.push_back(supera_index + i);
+		coef.push_back(-reductionFactor);
+
+		snprintf(name, NAME_SIZE, "c10.a_%d", rowNumber); //numerazione progressiva dei vincoli
 		char* rowname = (char*)(&name[0]);
 		rowNumber++;
 
 		CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idx.size(), &zero, &sense, &matbeg, &idx[0], &coef[0], NULL, &rowname);
 		idx.clear();
 		coef.clear();
-		
-	}*/
-	
-	//TODO: test "if si >= smax then spi =1-y_i
-	/*sense = 'G'; 
+	}
+	//cout << "Vincoli (5.a) creati\n";
+
+	// 11. gestione flussi TX, senza interferenza 1.1  Sum(Sum(f_ijk)) <= U_tx * y_i 
+	sense = 'L';
 	matbeg = 0;
 	coef.clear();
 	idx.clear();
-	for(int i = 0; i < getTotalPotentialNodes(); i++) // V'
+
+	for(int i = getUsrsNum(); i < getTotalPotentialNodes(); i++)  // P
 	{
-		bigM = 2*reductionFactor; //TODO
-		
-		idx.push_back(s_index + i );
-		coef.push_back(1.0);
+		// somma f_i_j_k (1)
+		for(int j = 0; j < getTotalPotentialNodes(); j++) // V'
+		{
+			for(int k = 0; k < getCommsNum(); k++)
+			{
+				if (i != j && fMap[i][j][k] != -1)
+				{
+					idx.push_back(fMap[i][j][k]);
+					coef.push_back(1.0);
+				}
+			}
+		}
 
-		idx.push_back(supera_index + i);
-		coef.push_back(- bigM);
-		
-		snprintf(name, NAME_SIZE, "cX_%d", rowNumber); //numerazione progressiva dei vincoli
-		char* rowname = (char*)(&name[0]);
-		rowNumber++;
+		if(coef.size() > 0)
+		{
+			idx.push_back( y_index + i - getUsrsNum() );
+			coef.push_back( -getTXCapacity() );
+			//rhs = getTXCapacity() - rhs; 
 
-		CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idx.size(), &reductionFactor, &sense, &matbeg, &idx[0], &coef[0], NULL, &rowname);
-		idx.clear();
-		coef.clear();
-		
-	}*/
+			snprintf(name, NAME_SIZE, "c11_%d", rowNumber); //numerazione progressiva dei vincoli
+			char* rowname = (char*)(&name[0]);
+			rowNumber++;
 
-	//7. gestione interferenza (TX) 1.0
+			CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idx.size(), &zero, &sense, &matbeg, &idx[0], &coef[0], NULL, &rowname);
+			idx.clear();
+			coef.clear();
+		}
+	}
+	//cout << "Vincoli (7) creati\n";
 
+	//11.a gestione flussi TX, senza interferenza 1.1
+
+	sense = 'L';
+	matbeg = 0;
+	coef.clear();
+	idx.clear();
+
+	for(int i = 0; i < getUsrsNum(); i++)  // V
+	{
+		// somma f_i_j_k (1)
+		for(int j = getUsrsNum(); j< getTotalPotentialNodes(); j++) // P
+		{
+			for(int k = 0; k < getCommsNum(); k++)
+			{
+				if (i != j && fMap[i][j][k] != -1)
+				{
+					idx.push_back(fMap[i][j][k]);
+					coef.push_back(1.0);
+				}
+			}
+		}
+
+		if(coef.size() > 0)
+		{
+			// termine noto
+			double rhs = getTXCapacity();
+
+			snprintf(name, NAME_SIZE, "c11.a_%d", rowNumber); //numerazione progressiva dei vincoli
+			char* rowname = (char*)(&name[0]);
+			rowNumber++;
+
+			CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idx.size(), &rhs, &sense, &matbeg, &idx[0], &coef[0], NULL, &rowname);
+			idx.clear();
+			coef.clear();
+		}
+	}
+
+	//11.  Gestione interferenza lato TX   (7)
+/*
 	bigM = 10 * getTXCapacity(); //set the big M value for each specific constraint //TODO
 
 	sense = 'L';
@@ -1055,7 +1406,7 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 	}
 	//cout << "Vincoli (7) creati\n";
 
-	//7.a
+	//11.a  Sum(Sum(f_ijk)) <= U_tx
 
 	sense = 'L';
 	matbeg = 0;
@@ -1097,173 +1448,13 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 		CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idx.size(), &rhs, &sense, &matbeg, &idx[0], &coef[0], NULL, &rowname);
 		idx.clear();
 		coef.clear();
-	}
+	}*/
 	//cout << "Vincoli (7.a) creati\n";
 
-	// 7. gestione flussi TX, senza interferenza 1.1
-	/*sense = 'L';
-	matbeg = 0;
-	coef.clear();
-	idx.clear();
 
-	for(int i = getUsrsNum(); i < getTotalPotentialNodes(); i++)  // P
-	{
-		// somma f_i_j_k (1)
-		for(int j = 0; j < getTotalPotentialNodes(); j++) // V'
-		{
-			for(int k = 0; k < getCommsNum(); k++)
-			{
-				if (i != j && fMap[i][j][k] != -1)
-				{
-					idx.push_back(fMap[i][j][k]);
-					coef.push_back(1.0);
-				}
-			}
-		}
-
-		if(coef.size() > 0)
-		{
-			idx.push_back( y_index + i - getUsrsNum() );
-			coef.push_back( -getTXCapacity() );
-			//rhs = getTXCapacity() - rhs; 
-
-			snprintf(name, NAME_SIZE, "c7_%d", rowNumber); //numerazione progressiva dei vincoli
-			char* rowname = (char*)(&name[0]);
-			rowNumber++;
-
-			CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idx.size(), &zero, &sense, &matbeg, &idx[0], &coef[0], NULL, &rowname);
-			idx.clear();
-			coef.clear();
-		}
-	}
-	//cout << "Vincoli (7) creati\n";
-
-	//7.a gestione flussi TX, senza interferenza 1.1
-
-	sense = 'L';
-	matbeg = 0;
-	coef.clear();
-	idx.clear();
-
-	for(int i = 0; i < getUsrsNum(); i++)  // V
-	{
-		// somma f_i_j_k (1)
-		for(int j = getUsrsNum(); j< getTotalPotentialNodes(); j++) // P
-		{
-			for(int k = 0; k < getCommsNum(); k++)
-			{
-				if (i != j && fMap[i][j][k] != -1)
-				{
-					idx.push_back(fMap[i][j][k]);
-					coef.push_back(1.0);
-				}
-			}
-		}
-
-		if(coef.size() > 0)
-		{
-			// termine noto
-			double rhs = getTXCapacity();
-
-			snprintf(name, NAME_SIZE, "c7.a_%d", rowNumber); //numerazione progressiva dei vincoli
-			char* rowname = (char*)(&name[0]);
-			rowNumber++;
-
-			CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idx.size(), &rhs, &sense, &matbeg, &idx[0], &coef[0], NULL, &rowname);
-			idx.clear();
-			coef.clear();
-		}
-	}*/
-
-	// 8. conservazione flusso
-	sense = 'E';
-	matbeg = 0;
-	coef.clear();
-	idx.clear();
-	for (int v = 0; v < getTotalPotentialNodes(); v++)
-	{
-		for (int k = 0; k < getCommsNum(); k++)
-		{
-			for (int i = 0; i < getTotalPotentialNodes(); i++)
-			{
-				//if (i != v && graph[i][v] != 0)
-				//if (i != v && !(v < n && i < n)) //condizione più generale, include le fijk di nodi tra cui non ci sono link
-				if (i != v && fMap[i][v][k] != -1) //*** a meno della presenza di nodi isolati, ci sarà per ogni vincolo almeno una coppia di f tc fmap[][][]!=-1
-				{
-					idx.push_back(fMap[i][v][k]);
-					coef.push_back(1.0);
-				}
-			}
-
-			for (int j = 0; j < getTotalPotentialNodes(); j++)
-			{
-				//if (v != j && graph[v][j] != 0)
-				if (v != j && fMap[v][j][k] != -1) //***condizione più generale, include le fijv di nodi tra cui non ci sono link
-				{
-					idx.push_back(fMap[v][j][k]);
-					coef.push_back(-1.0);
-				}
-			}
-
-			snprintf(name, NAME_SIZE, "c8_%d", rowNumber); //numerazione progressiva dei vincoli
-			char* rowname = (char*)(&name[0]);
-			rowNumber++;
-
-
-			CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idx.size(), &b[v][k], &sense, &matbeg, &idx[0], &coef[0], NULL, &rowname);
-			idx.clear();
-			coef.clear();
-
-		}
-	}
-	//cout << "Vincoli (8) creati\n";
-
-	// 9. legame tra variabili x_i_j e y_j
-	sense = 'L';
-	matbeg = 0;
-	coef.clear();
-	idx.clear();
-	for (int j = getUsrsNum(); j < getTotalPotentialNodes(); j++)
-	{
-		for (int i = 0; i < getTotalPotentialNodes(); i++)
-		{
-			//if (i != j && graph[i][j] != 0)
-			//if (i != j && xMap[i][j] != -1) //***
-			if (i != j && xMap[i][j] != -1 && xMap[j][i] != -1) //***
-			{
-				//add x_i_j
-				idx.push_back(xMap[i][j]);
-				coef.push_back(1.0);
-
-				//add -y_j
-				idx.push_back(y_index + (j - getUsrsNum()));
-				coef.push_back(-1.0);
-
-				snprintf(name, NAME_SIZE, "c9_%d", rowNumber); //numerazione progressiva dei vincoli
-				char* rowname = (char*)(&name[0]);
-				rowNumber++;
-
-				CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idx.size(), &zero, &sense, &matbeg, &idx[0], &coef[0], NULL, &rowname);
-
-				//add x_j_i
-				idx[0] = xMap[j][i];
-				
-
-				snprintf(name, NAME_SIZE, "c9_%d", rowNumber); //numerazione progressiva dei vincoli
-				rowname = (char*)(&name[0]);
-				rowNumber++;
-
-				CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idx.size(), &zero, &sense, &matbeg, &idx[0], &coef[0], NULL, &rowname);
-				idx.clear();
-				coef.clear();
-			}
-		}
-	}
-
-	//cout << "Vincoli (9) creati\n";
 
 	// 10. un drone non puo' mantenere piu' di s potenziali connessioni simultanee
-	sense = 'L';
+	/*sense = 'L';
 	matbeg = 0;
 	coef.clear();
 	idx.clear();
@@ -1291,160 +1482,8 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 			idx.clear();
 			coef.clear();
 		}
-	}
-	//cout << "Vincoli (10) creati\n";
-
-
-	// 11. non posizionare piu' di d droni
-	double temp_d = (double)getDrnsNum();
-	sense = 'L';
-	matbeg = 0;
-	coef.clear();
-	idx.clear();
-	for (int i = 0; i < getTotalPotentialNodes() - getUsrsNum(); i++)
-	{
-		idx.push_back(y_index + i);
-		coef.push_back(1.0);
-	}
-
-	snprintf(name, NAME_SIZE, "c11_%d", rowNumber); //numerazione progressiva dei vincoli
-	char* rowname = (char*)(&name[0]);
-	rowNumber++;
-
-	CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idx.size(), &temp_d, &sense, &matbeg, &idx[0], &coef[0], NULL, &rowname);
-	idx.clear();
-	coef.clear();
-
-	//cout << "Vincoli (11) creati\n";
-
-	// 12. Legame tra le variabili f_i_j_k e y_i
-
-	//vers. 1.1
-	//12.a
-	/*bigM = max(getRXCapacity(),getTXCapacity()); //set the big M value for each specific constraint
-	sense = 'L';
-	matbeg = 0;
-	idx.clear();
-	coef.clear();
-
-	for (int i = getUsrsNum(); i < getTotalPotentialNodes(); i++) // P
-	{
-		for (int j = 0; j < getTotalPotentialNodes(); j++) // V'
-		{
-			//if (!(j < n && i < n)) //esclude i link i cui estremi sono entrambi nodi utenti //***
-			for (int k = 0; k < getCommsNum(); k++)
-			{
-				if (i != j && fMap[i][j][k] != -1) //***
-				{
-					//f_i_j_k - My_i
-					idx.push_back(fMap[i][j][k]);
-					coef.push_back(1.0);
-
-					idx.push_back(y_index + i - getUsrsNum());
-					coef.push_back(-bigM);
-
-					snprintf(name, NAME_SIZE, "c12_%d", rowNumber); //numerazione progressiva dei vincoli
-					char* rowname = (char*)(&name[0]);
-					rowNumber++;
-	
-					CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idx.size(), &zero, &sense, &matbeg, &idx[0], &coef[0], NULL, &rowname);
-					idx.clear();
-					coef.clear();
-				}
-			}
-		}
-	}
-
-	//12.b
-	for (int i = 0; i < getTotalPotentialNodes(); i++) // V'
-	{
-		for (int j = getUsrsNum(); j < getTotalPotentialNodes(); j++) // P
-		{
-			//if (!(j < n && i < n)) //esclude i link i cui estremi sono entrambi nodi utenti //***
-			for (int k = 0; k < getCommsNum(); k++)
-			{
-				if (i != j && fMap[i][j][k] != -1) //***
-				{
-					//f_i_j_k - My_j
-					idx.push_back(fMap[i][j][k]);
-					coef.push_back(1.0);
-
-					idx.push_back(y_index + j - getUsrsNum());
-					coef.push_back(-bigM);
-
-					snprintf(name, NAME_SIZE, "c12_%d", rowNumber); //numerazione progressiva dei vincoli
-					char* rowname = (char*)(&name[0]);
-					rowNumber++;
-	
-					CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idx.size(), &zero, &sense, &matbeg, &idx[0], &coef[0], NULL, &rowname);
-					idx.clear();
-					coef.clear();
-				}
-			}
-		}
 	}*/
-
-
-	//cout << "Vincoli (12) creati\n" << endl;
-
-	// 12. vers 1.0
-	bigM = max(getRXCapacity(),getTXCapacity()); //set the big M value for each specific constraint
-	sense = 'L';
-	matbeg = 0;
-	idx.clear();
-	coef.clear();
-	for (int i = 0; i < getTotalPotentialNodes(); i++)
-	{
-		for (int j = 0; j < getTotalPotentialNodes(); j++)
-		{
-			//if (i != j) ***
-			//{
-			//if (!(j < n && i < n)) //esclude i link i cui estremi sono entrambi nodi utenti //***
-			//{
-			for (int k = 0; k < getCommsNum(); k++)
-			{
-				if (i != j && fMap[i][j][k] != -1) //***
-				{
-					idx.push_back(fMap[i][j][k]);
-					coef.push_back(1.0);
-				}
-			}
-			// f_i_j_k - M * x_i_j
-			if(coef.size() > 0)
-			{
-				idx.push_back(xMap[i][j]);
-				coef.push_back(-bigM);
-
-				snprintf(name, NAME_SIZE, "c12_%d", rowNumber); //numerazione progressiva dei vincoli
-				char* rowname = (char*)(&name[0]);
-				rowNumber++;
-	
-				CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idx.size(), &zero, &sense, &matbeg, &idx[0], &coef[0], NULL, &rowname);
-			}
-			idx.clear();
-			coef.clear();
-		}
-	}
-
-	//cout << "Vincoli (12) creati\n" << endl;
-
-	//test MIP start
-	/*
-	if(CPXsetintparam(env, CPX_PARAM_ADVIND, 1) != 0) 
-		cerr << __FUNCTION__ << "(): Impossibile settare MIP start." << endl;
-
-	int beg[] = {0};
-	int mcnt = 1;
-	int nzcnt = 1;
-	int varindices[] = {y_index + 23};
-	double values[] = {1.0};
-	int effortlevel[] = {CPX_MIPSTART_SOLVEMIP};
-
-	
-
-	if (CPXaddmipstarts(env, lp, mcnt, nzcnt, beg, varindices, values, effortlevel, NULL) != 0)
-		cerr << __FUNCTION__ << "(): Errore MIP start" << endl;
-	*/
+	//cout << "Vincoli (10) creati\n";
 
 	cout << "Max physical memory usage at model creation: " << getPeakRSS( ) << " KB" << endl;
 	cout << "Current memory usage, post-model: " << getCurrentRSS( ) / 1024 << "KB" << endl;
@@ -1454,51 +1493,6 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 	cout << "*Current memory usage, post-model: " << getCurrentRSS( ) / 1024 << "KB" << endl;*/
 	
 }
-
-
-//si utilizza il tool esterno DOT per creare un'immagine del grafo. Per fare cio' prima si codifica il grafo nel formato dot su un file, e poi si lancia automaticamente il tool
-/*int printDOTGraph(string filename)
-{
-	ofstream file;
-	file.open(filename, ios::out);
-	if (!file.is_open())
-	{
-		cerr << __FUNCTION__ << "(): Errore apertura del file " << filename << endl;
-		return 1;
-	}
-	else
-	{
-		if (isCEmpty() == true)
-		{
-			cerr << __FUNCTION__ << "(): Grafo vuoto." << endl;
-			return 1;
-		}
-		else //visita della matrice
-		{
-			file << "digraph G{\n"; //intestazione file .dot
-			for (unsigned int i = 0; i< c.size(); i++)
-			{
-				for (unsigned int j = 0; j< c[0].size(); j++)
-				{
-					if (i != j && !areOutOfSight(i, j))
-					{
-						
-						//Per ogni arco trovato, si stampa una riga su file che codifica l'arco e i due nodi suoi estremi,
-						//nel formato: idNodo1 -> idNodo2. arrowhead="none" permette di rappresentare l'arco come non orientato, mentre
-						//l'attributo xlabel permette di etichettare l'arco con una stringa, in questo caso il tipo di vincolo ( = o >= )
-						//e il valore wij corrispondente.
-						
-						file << "\t" << i << " -> " << j << " [xlabel=\"=" << getCost(i,j,0) << "\"];\n";
-						//fprintf(file,"\t%d -> %d [arrowhead=\"none\", xlabel=\"=%d\"];\n",i,j,c[i][j][0]);		
-
-					}
-				}
-			}
-		}
-		file << "}" << endl;
-		return 0;
-	}
-}*/
 
 void printConflictFile(string clpFile, CEnv env, Prob lp)
 {			

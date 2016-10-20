@@ -50,6 +50,7 @@ int getThreshold();
 int getMaxConnections();
 int getTotalPotentialNodes();
 int getTotalNodes();
+int getRequestedTraffic(int,int);
 
 double getWCInterferencePercentage();
 double getReductionFactor();

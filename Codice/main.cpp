@@ -1,5 +1,5 @@
 /**
-* @file modelv0.9.2.cpp
+* @file modelv1.2.cpp
 * @brief
 */
 #include <iostream>
@@ -228,6 +228,7 @@ int main(int argc, char const *argv[])
 	bool verbose = false;
 	//srand(time(NULL)); /* seed random number generator */
 	int contRelax[] = {0,0,0,0,0};
+	//int contRelax[] = {28};
 	int typeOfLPVariables = 5;
 	//string baseFileName;
 	if(argc == 1)
@@ -296,7 +297,8 @@ int main(int argc, char const *argv[])
 						if(relFile.is_open())
 						{
 							relFile << relaxedFile << endl;
-							csvFile << listOfInstance[i] << '\t';							
+							csvFile << listOfInstance[i] << '\t';	
+							vector< int > yLocations;						
 							for(int j = 0; j < (int) pow(2.0,double(typeOfLPVariables)); j++) 
 							{
 								if( (j & 16) != 16)
@@ -345,10 +347,21 @@ int main(int argc, char const *argv[])
 										if (round(instSolution->yPositions[l]) == 1)
 										{
 											dronesCount++;
+											yLocations.push_back(l);
 										}
 									}
 									relFile <<  dronesCount << "/" << getDrnsNum() << '\t';
 									csvFile <<  dronesCount << "/" << getDrnsNum() << '\t';
+
+									for(unsigned int i = 0; i< yLocations.size(); i++)
+									{
+										csvFile << "y" << yLocations[i];
+
+										if( i < yLocations.size()-1)
+											csvFile << ",";
+									}
+									csvFile << '\t';
+									yLocations.clear();
 									
 									delete instSolution;
 									relFile << endl << endl;

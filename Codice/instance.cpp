@@ -58,6 +58,14 @@ std::vector< int > txCapacity();
 
 std::vector< int > rxCapacity(); 
 
+int getRequestedTraffic(int i, int j)
+{
+	if(i < n && j < n)
+		return t[i][j];
+	else
+		return -2;
+}
+
 static double getInterferencePercentage(double xt, double yt, double xr, double yr)
 {
   int n = 1000; //numero di iterazioni
