@@ -58,6 +58,11 @@ std::vector< int > txCapacity();
 
 std::vector< int > rxCapacity(); 
 
+double getDeployCost(int i)
+{
+	return deployCost[i];
+}
+
 int getRequestedTraffic(int i, int j)
 {
 	if(i < n && j < n)

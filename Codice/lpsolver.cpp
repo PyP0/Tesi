@@ -51,6 +51,11 @@ static bool areOutOfSight(int i, int j) //TODO: controllarne effettiva funzional
 	return flag;
 }
 
+int gety_index()
+{
+	return y_index;
+}
+
 static void setupLP(CEnv env, Prob lp, int contRelax[])
 {
 
@@ -1555,7 +1560,8 @@ solution_t *solveLP(CEnv env, Prob lp, string baseFileName, bool verbose, int co
 	cout << "Current memory usage, after post-model: " << getCurrentRSS( ) / 1024 << " KB" << endl;
 	
 	
-		CHECKED_CPX_CALL(CPXwriteprob, env, lp, lpFile.c_str(), NULL);
+	CHECKED_CPX_CALL(CPXwriteprob, env, lp, lpFile.c_str(), NULL);
+	
 	// optimize
 
 	cout << endl << "--------------------------------------------" << endl << endl;
@@ -1622,6 +1628,179 @@ solution_t *solveLP(CEnv env, Prob lp, string baseFileName, bool verbose, int co
 	//if(verbose == true)	
 		printSimplifiedSolFile(env, lp, string(baseFileName + ".var.txt").c_str());
 	return solution;
+}
+
+solution_t *solveHeurLP(CEnv env, Prob lp, string baseFileName, bool verbose, int contRelax[])
+{
+	solution_t *instSolution = NULL;
+		try
+		{
+			// risolve MIP con rilassamento continuo
+			instSolution = solveLP(env, lp, baseFileName, verbose, contRelax);  
+			CHECKED_CPX_CALL(CPXsolwrite, env, lp, (baseFileName+ ".sol.relaxed").c_str()); //debug, remove after
+			
+			if(instSolution != NULL)
+			{
+				cout << "RELAXATION status code: " << instSolution->statusCode << endl; //debug
+
+				if (instSolution->statusCode == 103) //CPXMIP_INFEASIBLE 
+				{
+					// infeasibility detected
+					printConflictFile((baseFileName + ".clp"), env, lp);
+					cerr << __FUNCTION__ << "(): Infeasibility, impossibile procedere con la risoluzione euristica. " << endl;
+				}
+				else
+				{
+					vector< double > yValue;
+					vector< int > yIndexes;
+					
+					//discretizzazione variabili y con valore di soglia 0.1
+					for(unsigned int l = 0; l < instSolution->yPositions.size(); l++)
+					{
+						cout << instSolution->yPositions[l] << endl;
+						
+						double rounded = round(instSolution->yPositions[l] * 10.0) / 10.0; // arrotondamento al secondo decimale
+						
+						if(rounded >= 0.1) // vero -> c'e' un drone
+							yValue.push_back(1.0);
+						else
+							yValue.push_back(0.0);
+						
+						yIndexes.push_back(gety_index() + l);
+						
+						cout << "y" << l+getUsrsNum() << " : " << yValue[l] << " " << yIndexes[l] <<endl;
+					}
+					
+					//delete instSolution;
+					//instSolution = NULL;
+					
+					// ottimizza con MIP START
+
+					/*int beg[] = {0};
+					int effortlevel[] = {0};
+					status = CPXaddmipstarts (env, lp, 1, yValue.size(), beg, &yIndexes[0], &yValue[0], effortlevel, NULL);
+					cout << status << endl;
+					CPXwritemipstarts(env, lp, (fileName + ".mst").c_str(), 0, 0);
+					contRelax[0]=0;
+					instSolution = solveLP(env, lp, instance, true, contRelax);*/
+
+					std::chrono::high_resolution_clock::time_point start, end;
+					//alternativa: mantieni problema ma cambia bounds di y
+					
+					vector <char> lb(yIndexes.size(), 'L');
+					vector <char> ub(yIndexes.size(), 'U');
+					vector <char> newType(yIndexes.size(), 'B');
+					vector <double> lowerBounds(yIndexes.size(), 0.0);
+					vector <double> upperBounds(yIndexes.size(), 1.0);
+					
+					CHECKED_CPX_CALL(CPXchgctype, env, lp, yIndexes.size(), &yIndexes[0], &newType[0]);
+					
+					CHECKED_CPX_CALL(CPXchgbds, env, lp, yIndexes.size(), &yIndexes[0], &lb[0], &lowerBounds[0]);
+					CHECKED_CPX_CALL(CPXchgbds, env, lp, yIndexes.size(), &yIndexes[0], &ub[0], &upperBounds[0]);
+
+					start = std::chrono::high_resolution_clock::now(); //debug: output timestamp 
+						std::time_t timestamp = std::chrono::system_clock::to_time_t(start);
+					cout << "Optimization started at: " << std::ctime(&timestamp) << endl;
+					
+					start = std::chrono::high_resolution_clock::now(); //timestamp di inizio
+						CHECKED_CPX_CALL(CPXmipopt, env, lp);
+					end = std::chrono::high_resolution_clock::now(); //timestamp di fine
+					
+					timestamp = std::chrono::system_clock::to_time_t(end); //debug: output timestamp 
+					cout << "Optimization finished at: " << std::ctime(&timestamp) << endl;
+					
+
+					cout << "Istanza eseguita in "
+						<< std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() //casting per la conversione in millisecondi; (end-start).count() calcola la differenza di tempo e la restituisce come valore numerico
+						<< "ms" << " (" << std::chrono::duration_cast<std::chrono::seconds>(end - start).count() << "s c.ca).\n";
+
+					double objval = 0;
+					const int size = getPosNum();
+					double solutionArray[size]; 
+
+					//solution = new solution_t;
+					//aggiorna la soluzione
+					CHECKED_CPX_CALL(CPXgetobjval, env, lp, &objval);
+
+					instSolution->instName = baseFileName;
+					instSolution->objValue = objval;
+					instSolution->statusCode = CPXgetstat(env, lp);
+					instSolution->execTime = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+					instSolution->yPositions.clear();
+
+					int status = CPXgetx(env, lp, solutionArray, y_index, y_index + getTotalPotentialNodes() - getUsrsNum() - 1);
+					if (status == 0)
+					{
+						instSolution->yPositions.resize(size - getUsrsNum());
+						for (int i = 0; i < size - getUsrsNum() ; i++)
+						{
+							instSolution->yPositions[i] = solutionArray[i];
+						}
+						//solution->yPositions(solutionArray, solutionArray + sizeof(solutionArray) / sizeof (solutionArray[0]) );
+					}
+					else
+					{
+						//return vettore vuoto
+						instSolution->yPositions = vector<double>();
+					}					
+					
+					/*if(instSolution != NULL)
+					{
+						cout << "Status code: " << instSolution->statusCode << endl;
+
+						if (instSolution->statusCode == 103) //CPXMIP_INFEASIBLE 
+						{
+							// infeasibility detected
+							printConflictFile(clpFile, env, lp);
+						}
+						else
+						{
+							//printSolutionData(env, lp, y_index, solution);
+							if(verbose == true)
+							{
+								printSimplifiedSolFile(env, lp, solution.c_str());
+								printVarsValue(env, lp);
+							
+								//printNetworkUsage(env, lp);
+								//testSolutionFile("refIST3.txt", solution.c_str());
+							}
+
+							if (instSolution == NULL)
+								cerr << __FUNCTION__ << "(): Impossibile salvare la soluzione dell'istanza risolta." << endl;
+							else
+							{
+								if(verbose == true)
+									printSolution(instSolution);
+							}
+
+							//if(verbose == true)
+								CHECKED_CPX_CALL(CPXsolwrite, env, lp, solFile.c_str());
+						}
+					}
+					else
+						cerr << __FUNCTION__ << "(): Impossibile salvare la soluzione dell'istanza risolta." << endl;*/
+					// ???
+					
+					
+					if(verbose == true)
+					{
+						printSimplifiedSolFile(env, lp, (baseFileName + ".txt").c_str());
+						printVarsValue(env, lp);
+					}
+					CHECKED_CPX_CALL(CPXsolwrite, env, lp, (baseFileName + ".sol").c_str());
+				}
+			}
+			else
+				cerr << __FUNCTION__ << "(): Impossibile salvare la soluzione dell'istanza RELAXED risolta." << endl;
+		}
+		catch (exception& e)
+		{
+			cerr << __FUNCTION__ << "(): An exception has occurred: " << e.what() << endl;
+			if(instSolution != NULL)
+				delete instSolution;
+			return NULL;
+		}
+	return instSolution;
 }
 
 void printVarsValue(CEnv env, Prob lp)
