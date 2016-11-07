@@ -11,6 +11,7 @@
 #include "instance.h"
 #include "utility.h"
 #include "lpsolver.h"
+#include "heuristic.h"
 #include "getRSS.h"
 
 
@@ -53,116 +54,6 @@ vector< string > loadFileList(string masterFile)
 	}
 }
 
-solution_t *executeHeurInstance(string fileName, bool verbose, int contRelax[])
-{
-	solution_t *instSolution = NULL;
-	
-	// init
-
-	DECL_ENV(env);
-	DECL_PROB(env, lp);
-
-	/*if(CPXsetintparam(env, CPX_PARAM_DATACHECK, 1) != 0) 
-		cerr << __FUNCTION__ << "(): 1 Impossibile settare uno o piu' parametri di CPLEX." << endl;
-	
-	if(CPXsetintparam(env, CPX_PARAM_CONFLICTDISPLAY, 2) != 0) 
-		cerr << __FUNCTION__ << "(): 2 Impossibile settare uno o piu' parametri di CPLEX." << endl;
-
-	if(CPXsetintparam(env, CPX_PARAM_MEMORYEMPHASIS, 1) != 0) 
-		cerr << __FUNCTION__ << "(): 3 Impossibile settare uno o piu' parametri di CPLEX." << endl;
-
-	if(CPXsetintparam(env, CPX_PARAM_NODEFILEIND, 3) != 0) 
-		cerr << __FUNCTION__ << "(): 4 Impossibile settare uno o piu' parametri di CPLEX." << endl;
-
-	if(CPXsetdblparam(env, CPX_PARAM_TRELIM, 16384.0 ) != 0) //16GB
-		cerr << __FUNCTION__ << "(): 4 Impossibile settare uno o piu' parametri di CPLEX." << endl;*/
-
-
-	//CPXwriteparam (env, "CPLEXparams.prm");
-	
-	if ( CPXreadcopyparam(env, "CPLEXparams.prm") != 0)
-		cerr << __FUNCTION__ << "(): Impossibile leggere i parametri CPLEX dal file di configurazione, si usera' la configurazione standard." << endl;
-	
-	string baseFileName (fileName);
-	string instance = baseFileName;
-	string solution = baseFileName + ".txt";
-	string solFile = baseFileName + ".sol";
-	string clpFile = baseFileName + ".clp";
-
-	string logFile = baseFileName + ".log";
-	CPXFILEptr logF = CPXfopen(logFile.c_str(),"w"); 
-	CPXsetlogfile(env,logF);
-
-	if (loadInstance(instance.c_str()) != 0)
-	{
-		cerr << __FUNCTION__ <<" Impossibile caricare l'istanza: " << instance << endl;
-		return NULL;
-	}
-	else
-	{
-		cout << "Instance " << instance << " loaded." << endl;
-		if(verbose == true)
-		{
-			
-			cout << "Users: " << getUsrsNum() << endl;
-			cout << "Drones: " << getDrnsNum() << endl;
-			cout << "Potential drones positions: " << getPosNum() << endl << endl;
-			//printNodesIOFlow();
-			printTrafficMatrix();
-		}
-
-		try
-		{
-			instSolution = solveHeurLP(env, lp, instance, verbose, contRelax);
-			if(instSolution != NULL)
-			{
-				cout << "Status code: " << instSolution->statusCode << endl;
-
-				if (instSolution->statusCode == 103) //CPXMIP_INFEASIBLE 
-				{
-					// infeasibility detected
-					printConflictFile(clpFile, env, lp);
-				}
-				else
-				{
-					//printSolutionData(env, lp, y_index, solution);
-					if(verbose == true)
-					{
-						printSimplifiedSolFile(env, lp, solution.c_str());
-						printVarsValue(env, lp);
-					
-						//printNetworkUsage(env, lp);
-						//testSolutionFile("refIST3.txt", solution.c_str());
-					}
-
-					if (instSolution == NULL)
-						cerr << __FUNCTION__ << "(): Impossibile salvare la soluzione dell'istanza risolta." << endl;
-					else
-					{
-						if(verbose == true)
-							printSolution(instSolution);
-					}
-
-					//if(verbose == true)
-						CHECKED_CPX_CALL(CPXsolwrite, env, lp, solFile.c_str());
-				}
-			}
-
-			// free
-			CPXfreeprob(env, &lp);
-			CPXcloseCPLEX(&env);
-		}
-		catch (exception& e)
-		{
-			cerr << __FUNCTION__ << "(): An exception has occurred: " << e.what() << endl;
-			if(instSolution != NULL)
-				delete instSolution;
-			return NULL;
-		}
-	}
-	CPXfclose(logF);
-	return instSolution;
-}
 
 solution_t *executeInstance(string fileName, bool verbose, int contRelax[])
 {
@@ -415,7 +306,8 @@ int main(int argc, char const *argv[])
 							vector< int > yValue;						
 							for(int j = 0; j < (int) pow(2.0,double(typeOfLPVariables)); j++) 
 							{
-								if( (j == 0) || (j >= 12 && j <= 15)||(j >= 28 && j <= 31)) // debug: sottoinsieme di categorie delle istanze da eseguire
+								//if( (j == 0) || (j >= 12 && j <= 15)||(j >= 28 && j <= 31)) // debug: sottoinsieme di categorie delle istanze da eseguire
+								if(j >= 28 && j <= 31)
 								{
 									if( (j & 16) != 16)
 										relFile << "f" << '\t';
@@ -484,7 +376,6 @@ int main(int argc, char const *argv[])
 										delete instSolution;
 										relFile << endl << endl;
 									}
-
 								}
 							}
 							csvFile << endl;
@@ -496,7 +387,6 @@ int main(int argc, char const *argv[])
 							return 1;
 						}
 					}
-
 					cout << "Max physical memory usage: " << getPeakRSS( ) << " KB" << endl;
 				}
 				else
@@ -511,7 +401,7 @@ int main(int argc, char const *argv[])
 		}
 		
 
-		if(argc == 3 && string(argv[1]).compare(string("-X")) == 0)
+		/*if(argc == 3 && string(argv[1]).compare(string("-X")) == 0)
 		{
 			string pathToMaster(argv[2]);
 			pathToMaster = pathToMaster + MASTER_FILE;
@@ -604,11 +494,185 @@ int main(int argc, char const *argv[])
 				cerr << __FUNCTION__ << "(): Nessuna istanza presente nel file: " << pathToMaster << endl;
 				return 1;
 			}
+		}*/
+
+		if(argc == 3 && string(argv[1]).compare(string("-X")) == 0)
+		{
+			string pathToMaster(argv[2]);
+			pathToMaster = pathToMaster + MASTER_FILE;
+
+			//string pathToMasterSolFile(argv[2]);
+			//pathToMasterSolFile = pathToMasterSolFile + MASTER_SOLUTIONS_FILE;
+			vector< string > listOfInstance = loadFileList(pathToMaster.c_str()); 
+			if (listOfInstance.size() > 0)
+			{
+				string csvCumulativeFile = pathToMaster + ".heur.csv";
+				ofstream csvFile;
+					
+				csvFile.open(csvCumulativeFile, ios::out);
+				if(csvFile.is_open())
+				{
+					vector < solution_t* > solutions(2);
+					int count[1];
+					vector < int > yValue;
+
+					for(unsigned int i = 0; i < listOfInstance.size(); i++)
+					{	
+						//solve 1
+						DECL_ENV(env1);
+						DECL_PROB(env1, lp1);
+						if (loadInstance(listOfInstance[i].c_str()) != 0)
+						{
+							cerr << __FUNCTION__ <<" Impossibile caricare l'istanza: " << listOfInstance[i] << endl;
+							return 1;
+						}
+						else
+						{
+							
+							cout << "Instance " << listOfInstance[i] << " loaded." << endl;
+							
+							solution_t * heurSol = solve(env1,lp1, listOfInstance[i].c_str(), false);
+							
+							// free
+							CPXfreeprob(env1, &lp1);
+							CPXcloseCPLEX(&env1);
+							
+							if(heurSol == NULL)
+							{
+								cerr << __FUNCTION__ << "(): Soluzione non trovata per l'istanza " << listOfInstance[i] << endl;
+								csvFile << "-1" << '\t';
+								csvFile << "-1" << '\t';
+								csvFile << "-1" << '\t';
+								csvFile << "-1" << '\t';
+								csvFile << "-1" << '\t';
+								csvFile << "-1" << '\t';
+								csvFile << '\t';
+							}
+							else
+							{
+								//printSolution(heurSol);
+								csvFile << listOfInstance[i] << '\t';
+								csvFile << heurSol->objValue << '\t';
+								csvFile << heurSol->execTime << '\t';
+								csvFile << heurSol->statusCode << '\t';
+								int dronesCount = 0;
+									
+								for(unsigned int l = 0; l < heurSol->yPositions.size(); l++)
+								{
+									//if (round(instSolution->yPositions[l]) == 1) //
+									//double rounded = round(solutions[j]->yPositions[l] * 10.0) / 10.0;
+									if(heurSol->yPositions[l] > 0.0)
+									{
+										dronesCount++;
+										yValue.push_back(l);
+									}
+								}
+										
+								csvFile <<  dronesCount << "/" << getDrnsNum() << '\t';
+
+								for(unsigned int l = 0; l < yValue.size(); l++)
+								{
+									csvFile << "y" << yValue[l]+getUsrsNum();
+
+									if( l < yValue.size()-1)
+										csvFile << ",";
+								}
+								csvFile << '\t';
+
+
+								delete heurSol;
+								yValue.clear();
+							}
+							//csvFile << endl;
+						}
+
+
+
+						//solve 2
+						DECL_ENV(env2);
+						DECL_PROB(env2, lp2);
+						if (loadInstance(listOfInstance[i].c_str()) != 0)
+						{
+							cerr << __FUNCTION__ <<" Impossibile caricare l'istanza: " << listOfInstance[i] << endl;
+							return 1;
+						}
+						else
+						{
+							
+							cout << "Instance " << listOfInstance[i] << " loaded." << endl;
+							
+							solution_t * heurSol = solve2(env2,lp2, listOfInstance[i].c_str(),false);
+							
+							// free
+							CPXfreeprob(env2, &lp2);
+							CPXcloseCPLEX(&env2);
+							
+							if(heurSol == NULL)
+							{
+								cerr << __FUNCTION__ << "(): Soluzione non trovata per l'istanza " << listOfInstance[i] << endl;
+								
+								csvFile << "-1" << '\t';
+								csvFile << "-1" << '\t';
+								csvFile << "-1" << '\t';
+								csvFile << "-1" << '\t';
+								csvFile << "-1" << '\t';
+								csvFile << endl;
+							}
+							else
+							{
+								//printSolution(heurSol);
+								
+								csvFile << heurSol->objValue << '\t';
+								csvFile << heurSol->execTime << '\t';
+								csvFile << heurSol->statusCode << '\t';
+								int dronesCount = 0;
+									
+								for(unsigned int l = 0; l < heurSol->yPositions.size(); l++)
+								{
+									//if (round(instSolution->yPositions[l]) == 1) //
+									//double rounded = round(solutions[j]->yPositions[l] * 10.0) / 10.0;
+									if(heurSol->yPositions[l] > 0.0)
+									{
+										dronesCount++;
+										yValue.push_back(l);
+									}
+								}
+										
+								csvFile <<  dronesCount << "/" << getDrnsNum() << '\t';
+
+								for(unsigned int l = 0; l < yValue.size(); l++)
+								{
+									csvFile << "y" << yValue[l]+getUsrsNum();
+
+									if( l < yValue.size()-1)
+										csvFile << ",";
+								}
+								csvFile << '\t';
+
+
+								delete heurSol;
+								yValue.clear();
+							}
+							csvFile << endl;
+						}
+					}	
+						
+					cout << "Max physical memory usage: " << getPeakRSS( ) << " KB" << endl;
+				}
+				else
+					cerr << __FUNCTION__ << "(): Impossibile creare il file: " << csvCumulativeFile << endl;
+				return 1;
+			}
+			else
+			{
+				cerr << __FUNCTION__ << "(): Nessuna istanza presente nel file: " << pathToMaster << endl;
+				return 1;
+			}
 		}
 		
 		if(string(argv[1]).compare(string("-H")) == 0)
 		{
-			//arg 3: file istanza
+			/*//arg 3: file istanza
 			contRelax[0] = 31;
 
 			//esegue rilassamento lineare e salva le vars y su vector
@@ -621,6 +685,60 @@ int main(int argc, char const *argv[])
 				
 				cout << "Max physical memory usage: " << getPeakRSS( ) << " KB" << endl;
 				return 0;
+			}*/
+
+			//euristica threshold
+			//arg 3: file istanza
+			
+
+			string instance(argv[2]);
+			
+			DECL_ENV(env);
+			DECL_PROB(env, lp);
+			if ( CPXreadcopyparam(env, "CPLEXparams.prm") != 0)
+				cerr << __FUNCTION__ << "(): Impossibile leggere i parametri CPLEX dal file di configurazione, si usera' la configurazione standard." << endl;
+	
+	
+			if (loadInstance(instance.c_str()) != 0)
+			{
+				cerr << __FUNCTION__ <<" Impossibile caricare l'istanza: " << instance << endl;
+				return 1;
+			}
+			else
+			{
+				string logFile = instance + ".log";
+				CPXFILEptr logF = CPXfopen(logFile.c_str(),"w"); 
+				CPXsetlogfile(env,logF);
+
+				cout << "Instance " << instance << " loaded." << endl;
+				if(verbose == true)
+				{
+					
+					cout << "Users: " << getUsrsNum() << endl;
+					cout << "Drones: " << getDrnsNum() << endl;
+					cout << "Potential drones positions: " << getPosNum() << endl << endl;
+					//printNodesIOFlow();
+					printTrafficMatrix();
+				}
+
+				solution_t * heurSol = solve(env,lp, argv[2],true);
+				
+				// free
+				CPXfreeprob(env, &lp);
+				CPXcloseCPLEX(&env);
+				CPXfclose(logF);
+				
+				if(heurSol == NULL)
+				{
+					cerr << __FUNCTION__ << "(): Soluzione non trovata per l'istanza " << argv[2] << endl;
+					return 1;
+				}
+				else
+				{
+					printSolution(heurSol);
+					delete heurSol;
+					return 0;
+				}
 			}
 			/*if(instSolution != NULL)
 			{
@@ -662,6 +780,7 @@ int main(int argc, char const *argv[])
 		{
 			if(argc == 3)
 			{
+				contRelax[0] = 0;
 				string pathToMaster(argv[2]);
 				pathToMaster = pathToMaster + MASTER_FILE;
 
@@ -676,6 +795,7 @@ int main(int argc, char const *argv[])
 			}
 			else
 			{
+				contRelax[0] = 0;
 				int status = executeMaster(loadFileList(MASTER_FILE), MASTER_SOLUTIONS_FILE, verbose, contRelax);
 				
 				cout << "Max physical memory usage: " << getPeakRSS( ) << " KB" << endl;
@@ -689,7 +809,10 @@ int main(int argc, char const *argv[])
 			contRelax[0] = 0;
 			solution_t *instSolution = executeInstance(string(argv[1]),true,contRelax);
 			if(instSolution == NULL)
+			{
+				cerr << __FUNCTION__ << "(): No solution found in instance " << argv[1] << endl;
 				return 1;
+			}
 			else
 			{
 				delete instSolution;

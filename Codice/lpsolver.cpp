@@ -5,6 +5,7 @@
 #include <chrono>
 #include <ctime>
 #include <algorithm>
+#include <numeric>
 #include "cpxmacro.h"
 #include "lpsolver.h"
 #include "utility.h"
@@ -25,8 +26,27 @@ char name[NAME_SIZE];
 int f_index = 0;
 int y_index = 0;
 int x_index = 0;
-int w_index = 0;
 int z_index = 0;
+int s_index = 0;
+int supera_index = 0;
+
+int numfVars = 0;
+int numyVars = 0;
+int numxVars = 0;
+int numzVars = 0;
+int numsVars = 0;
+int numsuperaVars = 0;
+
+//vettori di supporto per lo switch continuo/intero
+vector <char> ynewType;
+vector <char> xnewType;
+vector <char> znewType;
+vector <char> superanewType;
+	
+vector <int> yIDX;
+vector <int> xIDX;
+vector <int> zIDX;
+vector <int> superaIDX;
 
 int bigM = 1000000; //default value
 
@@ -77,6 +97,7 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 	//aggiunta delle variabili f_i_j_k, una per volta, con i!=j
 	//nota: la variabile f_i_j_k e' distinta dalla variabile f_j_i_k
 	int fMapIndex = 0;
+	f_index = 0;
 	char ftype; 
 	
 	if( (contRelax[0] & 16) != 16) //rilassamento continuo?
@@ -104,7 +125,8 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 					
 					snprintf(name, NAME_SIZE, "f_%d_%d_%d", i, j, k); //scrive il nome della variabile f_i_j_k sulla stringa name[]
 					char* fname = (char*)(&name[0]);
-					CHECKED_CPX_CALL(CPXnewcols, env, lp, 1, &cost, &lb, &ub, &ftype, &fname);   //costruisce la singola variabile 
+					//CHECKED_CPX_CALL(CPXnewcols, env, lp, 1, &cost, &lb, &ub, &ftype, &fname);   //costruisce la singola variabile 
+					CHECKED_CPX_CALL(CPXnewcols, env, lp, 1, &zero, &lb, &ub, &ftype, &fname);   //costruisce la singola variabile 
 
 					//costruzione della map
 					fMap[i][j][k] = fMapIndex;
@@ -113,8 +135,9 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 			}
 		}
 	}
-
-	cout << "Sono state create " << CPXgetnumcols(env, lp) << " variabili f_i_j_k" << endl; //numero totale delle vars create	
+	
+	numfVars = CPXgetnumcols(env, lp);
+	cout << "Sono state create " << numfVars << " variabili f_i_j_k" << endl; //numero totale delle vars create	
 
 	//numerazione nodi: da 0 a n sono gli utenti, da n a n+d sono le posizioni potenziali
 	//inserimento delle variabili y_i
@@ -142,7 +165,8 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 
 
 	}
-	cout << "Sono state create " << CPXgetnumcols(env, lp) - y_index << " variabili y_i" << endl; //numero totale delle vars create	
+	numyVars = CPXgetnumcols(env, lp) - y_index;
+	cout << "Sono state create " << numyVars << " variabili y_i" << endl; //numero totale delle vars create	
 
 	//aggiunta delle variabili x_i_j
 
@@ -151,6 +175,8 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 
 	x_index = CPXgetnumcols(env, lp);
 	int xMapIndex = x_index;
+
+	bool printFlag = false; 
 
 	for (int i = 0; i < getUsrsNum(); i++)
 	{
@@ -166,8 +192,11 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 				else
 				{
 					xtype = 'C'; 
-					if( i == 0) //debug
+					if( printFlag == false) //debug
+					{
 						cout << "Rilassamento continuo su variabili x_i_j" << endl;
+						printFlag = true;
+					}
 				}
 				double lb = 0.0;
 				double ub = 1.0;
@@ -199,8 +228,6 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 				else
 				{
 					xtype = 'C';
-					if( i == 0) //debug
-						cout << "Rilassamento continuo su variabili x_i_j" << endl;
 				}
 				double lb = 0.0;
 				double ub = 1.0;
@@ -215,12 +242,14 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 			}
 		}
 	}
-
-	cout << "Sono state create " << CPXgetnumcols(env, lp) - x_index << " variabili x_i_j" << endl; //numero totale delle vars create	
+	
+	numxVars = CPXgetnumcols(env, lp) - x_index;
+	cout << "Sono state create " << numxVars << " variabili x_i_j" << endl; //numero totale delle vars create	
 
 	
 	//aggiunta variabili z_i
-	int z_index = CPXgetnumcols(env, lp);
+	z_index = CPXgetnumcols(env, lp);
+	
 	//int zMapIndex = z_index;
 	for (int i = 0; i < getTotalPotentialNodes(); i++)
 	{
@@ -249,11 +278,12 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 		
 	}
 
-	cout << "Sono state create " << CPXgetnumcols(env, lp) - z_index << " variabili z_i" << endl;  //numero totale delle vars create
+	numzVars = CPXgetnumcols(env, lp) - z_index;
+	cout << "Sono state create " << numzVars  << " variabili z_i" << endl;  //numero totale delle vars create
 
 
 	//aggiunta variabili s_i
-	int s_index = CPXgetnumcols(env, lp);
+	s_index = CPXgetnumcols(env, lp);
 	for (int i = 0; i < getTotalPotentialNodes(); i++)
 	{
 		char stype = 'C'; 
@@ -267,11 +297,12 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 		CHECKED_CPX_CALL(CPXnewcols, env, lp, 1, &zero, &lb, &ub, &stype, &sname);   //costruisce la singola variabile 
 	}
 
-	cout << "Sono state create " << CPXgetnumcols(env, lp) - s_index << " variabili s_i" << endl;  //numero totale delle vars create
+	numsVars = CPXgetnumcols(env, lp) - s_index;
+	cout << "Sono state create " << numsVars << " variabili s_i" << endl;  //numero totale delle vars create
 
 
 	//aggiunta variabili supera_i
-	int supera_index = CPXgetnumcols(env, lp);
+	supera_index = CPXgetnumcols(env, lp);
 	for (int i = 0; i < getTotalPotentialNodes(); i++)
 	{  
 		char sptype; 
@@ -293,8 +324,14 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 		CHECKED_CPX_CALL(CPXnewcols, env, lp, 1, &zero, &lb, &ub, &sptype, &sname);   //costruisce la singola variabile 
 	}
 
-	cout << "Sono state create " << CPXgetnumcols(env, lp) - supera_index << " variabili sp_i" << endl;  //numero totale delle vars create
+	numsuperaVars = CPXgetnumcols(env, lp) - supera_index;
+	cout << "Sono state create " << numsuperaVars << " variabili sp_i" << endl;  //numero totale delle vars create
 
+	
+	/*if(contRelax[0] == 31) //cambia tipo del problema
+	{
+		CPXchgprobtype(env, lp, CPXPROB_LP);
+	}*/
 
 	// 1.0 addition //
 
@@ -303,6 +340,17 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 	
 	cout << "Smax parameter: " << reductionFactor << endl;
 
+	//vettori di supporto per lo switch continuo/intero
+
+	yIDX.resize(numyVars); 
+	xIDX.resize(numxVars);
+	zIDX.resize(numzVars);
+	superaIDX.resize(numsuperaVars);
+	
+	iota(yIDX.begin(), yIDX.end(), y_index);
+	iota(xIDX.begin(), xIDX.end(), x_index);
+	iota(zIDX.begin(), zIDX.end(), z_index);
+	iota(superaIDX.begin(), superaIDX.end(), supera_index);
 	//=========================================================================
 	//=========================================================================
 	//									vincoli
@@ -320,12 +368,47 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 	
 
 	// Test pre euristica: y_i >= 1
+	/*idx.clear();
+	coef.clear();
+	for(int i=5; i< getTotalPotentialNodes(); i++)
+	{
+		if(i == 11 || i == 20 || i == 23)
+		{
+			sense = 'G';
+			matbeg = 0;
+
+			idx.push_back(y_index + i - getUsrsNum());
+			coef.push_back(1.0);
+
+			snprintf(name, NAME_SIZE, "cY_%d", rowNumber); //numerazione progressiva dei vincoli
+			char* rowname_ = (char*)(&name[0]);
+			rowNumber++;
+
+			CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idx.size(), &uno, &sense, &matbeg, &idx[0], &coef[0], NULL, &rowname_);
+			idx.clear();
+			coef.clear();
+		}
+		else
+		{
+			sense = 'E';
+			matbeg = 0;
+			idx.push_back(y_index + i - getUsrsNum());
+			coef.push_back(1.0);
+			snprintf(name, NAME_SIZE, "cY_%d", rowNumber); //numerazione progressiva dei vincoli
+			char* rowname_ = (char*)(&name[0]);
+			rowNumber++;
+
+			CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idx.size(), &zero, &sense, &matbeg, &idx[0], &coef[0], NULL, &rowname_);
+			idx.clear();
+			coef.clear();
+		}
+	}*/
 
 	/*sense = 'G';
 	matbeg = 0;
 	idx.clear();
 	coef.clear();
-	idx.push_back(y_index + 10 - getUsrsNum());
+	idx.push_back(y_index + 11 - getUsrsNum());
 	coef.push_back(1.0);
 
 	snprintf(name, NAME_SIZE, "cY_%d", rowNumber); //numerazione progressiva dei vincoli
@@ -338,33 +421,34 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 	
 	//
 	
-	idx.push_back(y_index + 13 - getUsrsNum());
-	coef.push_back(1.0);
-
-	snprintf(name, NAME_SIZE, "cY_%d", rowNumber); //numerazione progressiva dei vincoli
-	rowname_ = (char*)(&name[0]);
-	rowNumber++;
-
-	CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idx.size(), &uno, &sense, &matbeg, &idx[0], &coef[0], NULL, &rowname_);
-	idx.clear();
-	coef.clear();
-
-	//
-
-	idx.push_back(y_index + 15 - getUsrsNum());
-	coef.push_back(1.0);
-
-	snprintf(name, NAME_SIZE, "cY_%d", rowNumber); //numerazione progressiva dei vincoli
-	rowname_ = (char*)(&name[0]);
-	rowNumber++;
-
-	CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idx.size(), &uno, &sense, &matbeg, &idx[0], &coef[0], NULL, &rowname_);
-	idx.clear();
-	coef.clear();
-
-	//
-
 	idx.push_back(y_index + 20 - getUsrsNum());
+	coef.push_back(1.0);
+
+	snprintf(name, NAME_SIZE, "cY_%d", rowNumber); //numerazione progressiva dei vincoli
+	rowname_ = (char*)(&name[0]);
+	rowNumber++;
+
+	CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idx.size(), &uno, &sense, &matbeg, &idx[0], &coef[0], NULL, &rowname_);
+	idx.clear();
+	coef.clear();
+
+	//
+
+	idx.push_back(y_index + 23 - getUsrsNum());
+	coef.push_back(1.0);
+
+	snprintf(name, NAME_SIZE, "cY_%d", rowNumber); //numerazione progressiva dei vincoli
+	rowname_ = (char*)(&name[0]);
+	rowNumber++;
+
+	CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idx.size(), &uno, &sense, &matbeg, &idx[0], &coef[0], NULL, &rowname_);
+	idx.clear();
+	coef.clear();*/
+
+
+	//
+
+	/*idx.push_back(y_index + 20 - getUsrsNum());
 	coef.push_back(1.0);
 
 	snprintf(name, NAME_SIZE, "cY_%d", rowNumber); //numerazione progressiva dei vincoli
@@ -502,10 +586,10 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 	{
 		for (int j = 0; j < getTotalPotentialNodes(); j++) // V'
 		{
-			//if (!(j < n && i < n)) //esclude i link i cui estremi sono entrambi nodi utenti //***
+			//if (!(j < n && i < n)) //esclude i link i cui estremi sono entrambi nodi utenti 
 			for (int k = 0; k < getCommsNum(); k++)
 			{
-				if (i != j && fMap[i][j][k] != -1) //***
+				if (i != j && fMap[i][j][k] != -1) 
 				{
 					//f_i_j_k - My_i
 					idx.push_back(fMap[i][j][k]);
@@ -531,10 +615,10 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 	{
 		for (int j = getUsrsNum(); j < getTotalPotentialNodes(); j++) // P
 		{
-			//if (!(j < n && i < n)) //esclude i link i cui estremi sono entrambi nodi utenti //***
+			//if (!(j < n && i < n)) //esclude i link i cui estremi sono entrambi nodi utenti 
 			for (int k = 0; k < getCommsNum(); k++)
 			{
-				if (i != j && fMap[i][j][k] != -1) //***
+				if (i != j && fMap[i][j][k] != -1) 
 				{
 					//f_i_j_k - My_j
 					idx.push_back(fMap[i][j][k]);
@@ -569,7 +653,7 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 		{
 			for (int k = 0; k < getCommsNum(); k++)
 			{
-				if (i != j && fMap[i][j][k] != -1) //***
+				if (i != j && fMap[i][j][k] != -1) 
 				{
 					//SUM(f_i_j_k)
 					idx.push_back(fMap[i][j][k]);
@@ -601,7 +685,7 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 		{
 			for (int k = 0; k < getCommsNum(); k++)
 			{
-				if (i != j && fMap[i][j][k] != -1) //***
+				if (i != j && fMap[i][j][k] != -1) 
 				{
 					//SUM(f_i_j_k)
 					idx.push_back(fMap[i][j][k]);
@@ -990,7 +1074,9 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 	for( int i = getUsrsNum(); i < getTotalPotentialNodes(); i++) // P
 	{
 		double rhs = 0;
-		int bigMMultiplyCounter = 0;
+		///int bigMMultiplyCounter = 0;
+		bigM = 0.0;
+
 		// sconto_i
 		idx.push_back(s_index + i);
 		coef.push_back(1.0);
@@ -1002,17 +1088,16 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 			if(i != j && distance > getEpsilonNodeRadius() && distance <= getNodeRadius()) //R_epsilon excluded
 			{
 				idx.push_back(y_index + j - getUsrsNum());
-				//cout << "passo j,i : " << j << " " << i << endl;
 				coef.push_back(-getInterference(j,i));
 
-				bigMMultiplyCounter++;
+				bigM += getInterference(j,i);
+				///bigMMultiplyCounter++;
 			}
 		}
 
-		bigMMultiplyCounter = min(bigMMultiplyCounter+1, getDrnsNum());
+		///bigMMultiplyCounter = min(bigMMultiplyCounter+1, getDrnsNum());
 
 		// sum Aji * y_j su V
-
 		for(int j = 0; j < getUsrsNum(); j++) // V
 		{
 			double distance = getDistance(mapGrid[i].x, mapGrid[i].y, mapGrid[j].x, mapGrid[j].y);
@@ -1020,11 +1105,13 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 			{
 				rhs+= getInterference(j,i);
 
-				bigMMultiplyCounter++;
+				///bigMMultiplyCounter++;
+				bigM+= getInterference(j,i);
 			}
 		}
 
-		bigM = bigMMultiplyCounter * reductionFactor; //set the big M value for each specific constraint
+		bigM += 100; //final bigM value 
+		///bigM = bigMMultiplyCounter * reductionFactor; //set the big M value for each specific constraint
 		// -M(supera_i + 1 - y_i)
 
 		idx.push_back(supera_index + i);
@@ -1058,7 +1145,8 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 	
 	for( int i = 0; i < getUsrsNum(); i++) // V
 	{
-		int bigMMultiplyCounter = 0;
+		bigM = 0.0;
+		///int bigMMultiplyCounter = 0;
 
 		// sconto_i
 		idx.push_back(s_index + i);
@@ -1073,14 +1161,17 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 				idx.push_back(y_index + j - getUsrsNum());
 				coef.push_back(-getInterference(j,i));
 
-				bigMMultiplyCounter++;
+				bigM+= getInterference(j,i);
+				///bigMMultiplyCounter++;
 			}
 		}
 
-		bigMMultiplyCounter = min(bigMMultiplyCounter+1, getDrnsNum());
-		bigM = bigMMultiplyCounter * reductionFactor; //set the big M value for each specific constraint
-		// -M(supera_i)
+		///bigMMultiplyCounter = min(bigMMultiplyCounter+1, getDrnsNum());
+		///bigM = bigMMultiplyCounter * reductionFactor; //set the big M value for each specific constraint
+		
+		bigM += 100; //final bigM value 
 
+		// -M(supera_i)
 		idx.push_back(supera_index + i);
 		coef.push_back(bigM);
 
@@ -1106,7 +1197,8 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 	for(int i = getUsrsNum(); i < getTotalPotentialNodes(); i++)  // P
 	{
 		double rhs = 0;
-		int bigMMultiplyCounter = 0;
+		///int bigMMultiplyCounter = 0;
+		bigM = 0.0;
 
 		// sum Aji * y_j su P
 		for(int j = getUsrsNum(); j < getTotalPotentialNodes(); j++)  // P
@@ -1117,11 +1209,12 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 				idx.push_back(y_index + j - getUsrsNum());
 				coef.push_back(getInterference(j,i));
 
-				bigMMultiplyCounter++;
+				///bigMMultiplyCounter++;
+				bigM+= getInterference(j,i);
 			}
 		}
 
-		bigMMultiplyCounter = min(bigMMultiplyCounter+1, getDrnsNum());
+		///bigMMultiplyCounter = min(bigMMultiplyCounter+1, getDrnsNum());
 
 		// sum Aji su V
 
@@ -1132,11 +1225,13 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 			{
 				rhs-= getInterference(j,i);
 
-				bigMMultiplyCounter++; 
+				///bigMMultiplyCounter++; 
+				bigM+= getInterference(j,i);
 			}
 		}
 
-		bigM = bigMMultiplyCounter * reductionFactor; //set the big M value for each specific constraint
+		///bigM = bigMMultiplyCounter * reductionFactor; //set the big M value for each specific constraint
+		bigM += 100;
 
 		rhs+= reductionFactor;
 
@@ -1172,7 +1267,9 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 
 	for(int i = 0; i < getUsrsNum(); i++)  // V
 	{
-		int bigMMultiplyCounter = 0;
+		///int bigMMultiplyCounter = 0;
+		bigM = 0.0;
+
 		double rhs = 0;
 
 		// sum Aji * y_j su P
@@ -1184,12 +1281,14 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 				idx.push_back(y_index + j - getUsrsNum());
 				coef.push_back(getInterference(j,i));
 
-				bigMMultiplyCounter++;
+				///bigMMultiplyCounter++;
+				bigM+= getInterference(j,i);
 			}
 		}
 
-		bigMMultiplyCounter = min(bigMMultiplyCounter+1, getDrnsNum());
-		bigM = bigMMultiplyCounter * reductionFactor; //set the big M value for each specific constraint
+		///bigMMultiplyCounter = min(bigMMultiplyCounter+1, getDrnsNum());
+		///bigM = bigMMultiplyCounter * reductionFactor; //set the big M value for each specific constraint
+		bigM+= 100;
 
 		rhs= reductionFactor;
 
@@ -1469,14 +1568,14 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 		for (int i = 0; i < getTotalPotentialNodes(); i++)
 		{
 			//if (i != v)
-			if (xMap[i][v] != -1) //***
+			if (xMap[i][v] != -1) 
 			{
 				idx.push_back(xMap[i][v]);
 				coef.push_back(1.0);
 			}
 		}
 
-		if (idx.size() > 0) //***
+		if (idx.size() > 0) 
 		{
 
 			snprintf(name, NAME_SIZE, "c10_%d", rowNumber); //numerazione progressiva dei vincoli
@@ -1531,6 +1630,7 @@ void printSolution(solution_t *solution)
 		int count = 0;
 		cout << endl << "Soluzione istanza: " << endl;
 		cout << "Valore f. obiettivo: " << solution->objValue << endl;
+		cout << "*Tempo totale impiegato (ms): " << solution->execTime << endl;
 		for (int i = 0; i < getPosNum() - getUsrsNum(); i++)
 		{
 			if (round(solution->yPositions[i]) == 1)
@@ -1546,6 +1646,33 @@ void printSolution(solution_t *solution)
 	}
 }
 
+void printRelaxedSolution(solution_t *solution)
+{
+	if (solution == NULL)
+	{
+		cerr << __FUNCTION__ << "(): Soluzione non allocata." << endl;
+	}
+	else
+	{
+		int count = 0;
+		cout << endl << "*Soluzione istanza: " << endl;
+		cout << "*Valore f. obiettivo: " << solution->objValue << endl;
+		cout << "*Tempo totale impiegato (ms): " << solution->execTime << endl;
+		for (int i = 0; i < getPosNum() - getUsrsNum(); i++)
+		{
+			if (solution->yPositions[i] > 0)
+				count++;
+		}
+		cout << "*Droni impiegati/droni totali: " << count << "/" << getDrnsNum() << endl;
+
+		for (int i = 0; i < getPosNum() - getUsrsNum(); i++)
+		{
+			cout << "*y_" << i + getUsrsNum() << ": " << solution->yPositions[i] << endl;
+		}
+		cout << endl;
+	}
+}
+
 solution_t *solveLP(CEnv env, Prob lp, string baseFileName, bool verbose, int contRelax[])
 {
 	cout << "Current memory usage, before post-model: " << getCurrentRSS( ) / 1024 << " KB" << endl;
@@ -1555,7 +1682,7 @@ solution_t *solveLP(CEnv env, Prob lp, string baseFileName, bool verbose, int co
 	std::chrono::high_resolution_clock::time_point start, end;
 	solution_t *solution = NULL;
 	
-	// setup LP
+	// setupFR LP
 	setupLP(env, lp, contRelax);
 	cout << "Current memory usage, after post-model: " << getCurrentRSS( ) / 1024 << " KB" << endl;
 	
@@ -1801,6 +1928,50 @@ solution_t *solveHeurLP(CEnv env, Prob lp, string baseFileName, bool verbose, in
 			return NULL;
 		}
 	return instSolution;
+}
+
+solution_t *getSolution(CEnv env, Prob lp, unsigned long int execTime, string instanceName)
+{
+	solution_t *instSolution = NULL;
+	try
+	{
+		instSolution = new solution_t;
+		double objval = 0.0;
+		const int size = getPosNum();
+		double solutionArray[size];
+
+		CHECKED_CPX_CALL(CPXgetobjval, env, lp, &objval);
+
+		instSolution->instName = instanceName;
+		instSolution->objValue = objval;
+		instSolution->statusCode = CPXgetstat(env, lp);
+		instSolution->execTime = execTime;
+		instSolution->yPositions.clear();
+
+		int status = CPXgetx(env, lp, solutionArray, gety_index(), gety_index() + getTotalPotentialNodes() - getUsrsNum() - 1);
+		if (status == 0)
+		{
+			instSolution->yPositions.resize(size - getUsrsNum());
+			for (int i = 0; i < size - getUsrsNum() ; i++)
+			{
+				instSolution->yPositions[i] = solutionArray[i];
+			}
+			//solution->yPositions(solutionArray, solutionArray + sizeof(solutionArray) / sizeof (solutionArray[0]) );
+		}
+		else
+		{
+			//return vettore vuoto
+			instSolution->yPositions = vector<double>();
+		}	
+		return instSolution;
+	}
+	catch (exception& e)
+	{
+		cerr << __FUNCTION__ << "(): An exception has occurred: " << e.what() << endl;
+		if(instSolution != NULL)
+			delete instSolution;
+		return NULL;
+	}		
 }
 
 void printVarsValue(CEnv env, Prob lp)
@@ -2049,3 +2220,28 @@ void printSimplifiedSolFile(CEnv env, Prob lp, const char* solution)
 	}
 }
 
+void swapToInt(CEnv env, Prob lp)
+{
+	vector <char> ynewType(numyVars, 'B');
+	vector <char> xnewType(numxVars, 'B');
+	vector <char> znewType(numzVars, 'B');
+	vector <char> superanewType(numsuperaVars, 'B');
+	
+	CHECKED_CPX_CALL(CPXchgctype, env, lp, numyVars, &yIDX[0], &ynewType[0]);
+	CHECKED_CPX_CALL(CPXchgctype, env, lp, numxVars, &xIDX[0], &xnewType[0]);
+	CHECKED_CPX_CALL(CPXchgctype, env, lp, numzVars, &zIDX[0], &znewType[0]);
+	CHECKED_CPX_CALL(CPXchgctype, env, lp, numsuperaVars, &superaIDX[0], &superanewType[0]);
+}
+
+void swapToCont(CEnv env, Prob lp)
+{
+	vector <char> ynewType(numyVars, 'C');
+	vector <char> xnewType(numxVars, 'C');
+	vector <char> znewType(numzVars, 'C');
+	vector <char> superanewType(numsuperaVars, 'C');
+			
+	CHECKED_CPX_CALL(CPXchgctype, env, lp, numyVars, &yIDX[0], &ynewType[0]);
+	CHECKED_CPX_CALL(CPXchgctype, env, lp, numxVars, &xIDX[0], &xnewType[0]);
+	CHECKED_CPX_CALL(CPXchgctype, env, lp, numzVars, &zIDX[0], &znewType[0]);
+	CHECKED_CPX_CALL(CPXchgctype, env, lp, numsuperaVars, &superaIDX[0], &superanewType[0]);
+}

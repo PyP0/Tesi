@@ -8,5 +8,4 @@ int roundDown(int, int);
 double getDistance(int, int, int, int);
 bool isIntersection(double, double, double, double, double, double);
 bool isInRange(int, int, int, int, int);
-
 #endif
