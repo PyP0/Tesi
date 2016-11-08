@@ -23,16 +23,19 @@ int totalPotentialNodes = P;
 //numero di commodities, ovvero numero di coppie distinte sorgente-destinazione
 int K = n*(n - 1);
 
-int threshold = 100; //soglia oltre la quale un costo viene considerato infinito
+//int threshold = 100; //soglia oltre la quale un costo viene considerato infinito
+int threshold = 2000; //DATASET soglia oltre la quale un costo viene considerato infinito
 
 int s = 10; //numero massimo connessioni sostenibili da un drone
 
 int droneTXCapacity = 20000;
 int droneRXCapacity = 10000;
 
-int nodeRadius = 3;//250;//3; //metri
+//int nodeRadius = 3;//250;//3; //metri
+int nodeRadius = 150; //metri //DATASET
 
-int epsilonNodeRadius = 2;//20; //2; //metri
+//int epsilonNodeRadius = 2;//20; //2; //metri
+int epsilonNodeRadius = 30; // metri DATASET
 
 //parametri griglia
 int length = 0;

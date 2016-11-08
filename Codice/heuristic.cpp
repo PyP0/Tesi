@@ -421,7 +421,8 @@ solution_t *solve(CEnv env, Prob lp, string instance, bool verbose)
 	bool stop = false;
 
 	double threshold = 1.0;
-	double step = 0.05;
+	double step = 0.01;
+	double accstep = 0.005;
 	double stopValue = step;
 
 
@@ -437,6 +438,8 @@ solution_t *solve(CEnv env, Prob lp, string instance, bool verbose)
 
 	start = std::chrono::high_resolution_clock::now(); //timestamp di inizio
 
+	bool firstFound = false;
+
 	solution_t *firstSolution = startingSolution(env, lp, instance, contRelax); //kick-start: soluzione iniziale
 	if(firstSolution == NULL)
 	{
@@ -451,30 +454,7 @@ solution_t *solve(CEnv env, Prob lp, string instance, bool verbose)
 			printRelaxedSolution(firstSolution);
 		}
 
-		//double currentValue = evaluate(firstSolution);
-		//double bestValue = currentValue;
-
 		solution_t *solution = NULL;
-
-		try
-		{
-			solution = new solution_t;
-		}
-		catch (exception& e)
-		{
-			cerr << __FUNCTION__ << "(): An exception has occurred: " << e.what() << endl;
-			delete firstSolution;
-			
-			return NULL;
-		}
-		//const int size = getPosNum();
-		//double solutionArray[size]; 
-		
-		
-		//int status;
-		//CPXLPptr originalLP = CPXcloneprob(env,lp, &status);
-		
-		
 
 		//recupero array y
 		int status = CPXgetx(env, lp, &firstSolutionArray[0], gety_index(), gety_index() + getTotalPotentialNodes() - getUsrsNum() - 1);
@@ -487,158 +467,154 @@ solution_t *solve(CEnv env, Prob lp, string instance, bool verbose)
 
 		while(stop != true)
 		{
+			//elaboro array y
+			if(verbose == true)
+			{
+				cout << "--------------------------------------------------------------------" <<endl;
+				cout << "Threshold: " << threshold << endl;
+			}
+			for(unsigned int l = 0; l < firstSolutionArray.size(); l++)
+			{			
+				
+				if(firstSolutionArray[l] >= threshold ) // vero -> c'e' un drone
+				{
+					solutionArray[l] = 1.0;
+				}
+				else
+				{
+					solutionArray[l] = 0.0;
+				}
+				
+				//cout << "y" << l + getUsrsNum() << " " << solutionArray[l] << endl;
+				yIndexes.push_back(gety_index() + l);
+			}
 			
-			/*int status = CPXgetx(env, lp, &solutionArray[0], gety_index(), gety_index() + getTotalPotentialNodes() - getUsrsNum() - 1);
-			if (status != 0)
+			//aggiorno il mip start con il nuovo vettore y
+			for(unsigned int i = 0; i< solutionArray.size(); i++)
+			{
+				
+				if(solutionArray[i] == 0.0)
+				{
+					CHECKED_CPX_CALL(CPXchgbds, env, lp, 1, &yIndexes[i], &lb[0], &zeros[0]);
+					CHECKED_CPX_CALL(CPXchgbds, env, lp, 1, &yIndexes[i], &ub[0], &zeros[0]);
+				}
+				else
+				{
+					CHECKED_CPX_CALL(CPXchgbds, env, lp, 1, &yIndexes[i], &lb[0], &ones[0]);
+					CHECKED_CPX_CALL(CPXchgbds, env, lp, 1, &yIndexes[i], &ub[0], &ones[0]);
+				}
+				//CPXwriteprob( env, lp, (instance + to_string(threshold) + ".lp").c_str(), NULL);
+			}	
+			
+			//ripeto ottimizzazione con mip start
+			CPXmipopt(env, lp); 
+			//CPXsolwrite(env, lp, (instance + "." + to_string(threshold) + ".sol").c_str());
+		
+			//check result
+			int optStat = CPXgetstat(env, lp);
+			
+			if(optStat == 101 || optStat == 102) //soluzione rilassata trovata
 			{
 
-			}
-			else
-			{*/
+				if(verbose == true)		
+					cout << "Soluzione rilassata trovata con soglia: " << threshold << endl;
 				
-				//elaboro array y
-				if(verbose == true)
-				{
-					cout << "--------------------------------------------------------------------" <<endl;
-					cout << "Threshold: " << threshold << endl;
-				}
-				for(unsigned int l = 0; l < firstSolutionArray.size(); l++)
-				{			
-					//double rounded = round(firstSolutionArray[l] * 10.0) / 10.0 ; // arrotondamento al secondo decimale
-					//printf("%f\t%f\t", firstSolutionArray[l],threshold );
-					//cout << rounded << endl;			
-					
-					if(firstSolutionArray[l] >= threshold ) // vero -> c'e' un drone
-					{
-						solutionArray[l] = 1.0;
-					}
-					else
-					{
-						solutionArray[l] = 0.0;
-					}
-					
-					//cout << "y" << l + getUsrsNum() << " " << solutionArray[l] << endl;
-					yIndexes.push_back(gety_index() + l);
-				}
-				solution->yPositions.assign(solutionArray.begin(),solutionArray.end());
-
-				solution->objValue = evaluate(solution);
+				int intOptStat = 0;
 				
-				//aggiorno il mip start con il nuovo vettore y
-				for(unsigned int i = 0; i< solutionArray.size(); i++)
-				{
-					
-					if(solutionArray[i] == 0.0)
-					{
-						CHECKED_CPX_CALL(CPXchgbds, env, lp, 1, &yIndexes[i], &lb[0], &zeros[0]);
-						CHECKED_CPX_CALL(CPXchgbds, env, lp, 1, &yIndexes[i], &ub[0], &zeros[0]);
-					}
-					else
-					{
-						CHECKED_CPX_CALL(CPXchgbds, env, lp, 1, &yIndexes[i], &lb[0], &ones[0]);
-						CHECKED_CPX_CALL(CPXchgbds, env, lp, 1, &yIndexes[i], &ub[0], &ones[0]);
-					}
-					//CPXwriteprob( env, lp, (instance + to_string(threshold) + ".lp").c_str(), NULL);
-				}	
+				//esegui LP intero
+				if(verbose == true)	
+					CPXwriteprob( env, lp, (instance + ".cont.lp").c_str(), NULL);
 				
-				//ripeto ottimizzazione con mip start
+				swapToInt(env, lp);
+				
+				if(verbose == true)	
+					CPXwriteprob( env, lp, (instance + ".int.lp").c_str(), NULL);
+				
 				CPXmipopt(env, lp); 
-				//CPXsolwrite(env, lp, (instance + "." + to_string(threshold) + ".sol").c_str());
-					
 				
-				
-
-				//check result
-				int optStat = CPXgetstat(env, lp);
-				/*if ( optStat == 103) //CPXMIP_INFEASIBLE 
+				intOptStat = CPXgetstat(env, lp); 
+				if(intOptStat == 101 || intOptStat == 102) //soluzione intera: stop
 				{
-					// infeasibility detected
-					printConflictFile((instance + ".clp"), env, lp);
-							
-					solution->objValue = -1;
-					solution->statusCode = optStat;
+					stop = true;
+					end = std::chrono::high_resolution_clock::now(); //timestamp di fine
 					
-					cerr << __FUNCTION__ << "(): Conflict, impossibile procedere con la risoluzione euristica. " << endl;
+					if(verbose == true)	
+						cout << "Soluzione intera trovata con soglia: " << threshold << endl;
 					
-					return solution;
-				}*/
-				//else // 101 or 102 or no solution
-				//{
-					if(optStat == 101 || optStat == 102) //soluzione rilassata trovata
+					//aggiorna la soluzione
+					/*try
 					{
-						if(verbose == true)		
-							cout << "Soluzione rilassata trovata con soglia: " << threshold << endl;
-						
-						int intOptStat = 0;
-						
-						//esegui LP intero
-						if(verbose == true)	
-							CPXwriteprob( env, lp, (instance + ".cont.lp").c_str(), NULL);
-						
-						swapToInt(env, lp);
-						
-						if(verbose == true)	
-							CPXwriteprob( env, lp, (instance + ".int.lp").c_str(), NULL);
-						
-						CPXmipopt(env, lp); 
-						
-						intOptStat = CPXgetstat(env, lp); 
-						if(intOptStat == 101 || intOptStat == 102) //soluzione intera: stop
-						{
-							stop = true;
-							end = std::chrono::high_resolution_clock::now(); //timestamp di fine
-							
-							if(verbose == true)	
-								cout << "Soluzione intera trovata con soglia: " << threshold << endl;
-							
-							//aggiorna la soluzione
-							delete solution;
-							solution = getSolution(env, lp, std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count(), instance);
-							if(solution->yPositions.size() == 0)
-							{
-								cerr << __FUNCTION__ << "(): Impossibile recuperare la soluzione dell'istanza " << instance << endl;
-								delete solution;
-								return NULL;
-							}
-
-							if(verbose == true)	
-								CPXsolwrite(env, lp, (instance + ".int." + to_string(threshold) + ".sol").c_str());
-						}
-						else //non c'e' soluzione intera, ricomincia da quella rilassata
-						{
-							if(verbose == true)	
-								cout << "No soluzione intera con soglia: " << threshold << endl;
-							
-							swapToCont(env,lp);
-							threshold -= step;
-							solutionArray = firstSolutionArray; 
-							if(threshold < stopValue)
-							{
-								stop = true;	
-							}
-						}
+						solution = new solution_t;
 					}
-					else //no solution, riduco la soglia, reset della soluzione
+					catch (exception& e)
 					{
-						if(verbose == true)	
-							cout << "No soluzione rilassata con soglia: " << threshold << endl;
+						cerr << __FUNCTION__ << "(): An exception has occurred: " << e.what() << endl;
+						delete firstSolution;
+						
+						return NULL;
+					}*/
+
+					solution = getSolution(env, lp, std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count(), instance);
+					if(solution == NULL)
+					{
+						cerr << __FUNCTION__ << "(): Impossibile recuperare la soluzione dell'istanza " << instance << endl;
+						
+						return NULL;
+					}
+
+					if(solution->yPositions.size() == 0)
+					{
+						cerr << __FUNCTION__ << "(): Impossibile recuperare la soluzione dell'istanza " << instance << endl;
+						delete solution;
+						return NULL;
+					}
+
+					if(verbose == true)	
+						CPXsolwrite(env, lp, (instance + ".int." + to_string(threshold) + ".sol").c_str());
+				}
+				else //non c'e' soluzione intera, ricomincia da quella rilassata
+				{
+					if(verbose == true)	
+						cout << "No soluzione intera con soglia: " << threshold << endl;
+					
+					swapToCont(env,lp);
+
+					if(firstFound == false) //ricerca più approfondita
+					{
+						
+						firstFound = true;
+						threshold+= step;
+						
+						step = accstep;
 						
 						threshold -= step;
-						solutionArray = firstSolutionArray; 
-						if(threshold < stopValue)
-						{
-							stop = true;
-						}
+						
 					}
-				//}				
-			/*}
-			else
+					else
+					{
+						threshold -= step;
+						solutionArray = firstSolutionArray; 
+					}
+					
+					if(threshold < stopValue)
+					{
+						stop = true;	
+					}
+				}
+			}
+			else //no solution, riduco la soglia, reset della soluzione
 			{
-				cerr << __FUNCTION__ << "(): Errore nel recupero della soluzione dell'istanza. " << endl;
-				delete solution;
+				if(verbose == true)	
+					cout << "No soluzione rilassata con soglia: " << threshold << endl;
 				
-				return NULL;
-			}*/
+				threshold -= step;
+				
+				solutionArray = firstSolutionArray; 
+				if(threshold < stopValue ) //TODO: double comparison FUBAR, it misses one run
+				{
+					stop = true;
+				}
+			}
 		}
 		CPXsolwrite(env, lp, (instance + ".fin"  + ".sol").c_str());
 		//cleanup

@@ -1630,7 +1630,7 @@ void printSolution(solution_t *solution)
 		int count = 0;
 		cout << endl << "Soluzione istanza: " << endl;
 		cout << "Valore f. obiettivo: " << solution->objValue << endl;
-		cout << "*Tempo totale impiegato (ms): " << solution->execTime << endl;
+		cout << "Tempo totale impiegato (ms): " << solution->execTime << endl;
 		for (int i = 0; i < getPosNum() - getUsrsNum(); i++)
 		{
 			if (round(solution->yPositions[i]) == 1)
