@@ -32,10 +32,14 @@ int droneTXCapacity = 20000;
 int droneRXCapacity = 10000;
 
 //int nodeRadius = 3;//250;//3; //metri
-int nodeRadius = 150; //metri //DATASET
+//int nodeRadius = 250; //metri //DATASET
+//int nodeRadius = 100; //metri DATASET2
+int nodeRadius = 50; //metri DATASET3
+//int epsilonNodeRadius = 30; // metri DATASET2
+int epsilonNodeRadius = 15; // metri DATASET3
 
 //int epsilonNodeRadius = 2;//20; //2; //metri
-int epsilonNodeRadius = 30; // metri DATASET
+//int epsilonNodeRadius = 30; // metri DATASET
 
 //parametri griglia
 int length = 0;
@@ -46,7 +50,7 @@ std::vector< nodesCoordinates_t > grid;
 
 map<int, nodesCoordinates_t> mapGrid;
 
-std::vector< std::vector< std::vector<double> > > c(totalPotentialNodes, std::vector< std::vector<double> >(totalPotentialNodes, std::vector<double>(K, DISCONNECTED_COST)));
+//std::vector< std::vector< std::vector<double> > > c(totalPotentialNodes, std::vector< std::vector<double> >(totalPotentialNodes, std::vector<double>(K, DISCONNECTED_COST))); NOCOST
 
 //matrice bilanciamento flussi
 std::vector< std::vector<double> > b(totalPotentialNodes, std::vector<double>(K, 0)); 
@@ -60,6 +64,7 @@ vector< vector<double> > interference(totalPotentialNodes, vector<double>(totalP
 std::vector< int > txCapacity();
 
 std::vector< int > rxCapacity(); 
+
 
 double getDeployCost(int i)
 {
@@ -186,18 +191,18 @@ double getInterference(int i, int j)
 	return interference[i][j];
 }
 
-double getCost(int i, int j, int k)
+/*double getCost(int i, int j, int k) NOCOST
 {
 	return c[i][j][k];
-}
+}*/
 
-bool isCEmpty()
+/*bool isCEmpty() NOCOST
 {
 	if (c.size() > 0 && c[0].size() > 0 && c[0][0].size() > 0)
 		return false;
 	else
 		return true;
-}
+}*/
 
 /*void clearC()
 {
@@ -291,6 +296,211 @@ static void convertIntoBMatrix()
 	}
 }
 
+static int placeUsersFallback() //tolto il vincolo di distanza
+{
+	if (grid.size() > 0 && n > 0)
+	{
+		unordered_map<int, int> mapPool;
+		int size = length * height;
+		
+		mapPool.reserve(size);
+		for (int i = 0; i < size; i++)
+		{
+			mapPool[i] = i;
+			grid[i].isUser = false;
+			grid[i].id = -1;
+		}
+
+		for (int i = 0; i < n; i++)
+		{
+			//int chosenIndex = getRand(0, (int)mapPool.size()-1);
+			//int chosenValue = mapPool.at(chosenIndex);
+
+			int chosenIndex = 0;
+
+			if (mapPool.size() == 0)
+			{
+				cerr << __FUNCTION__ << "(): Impossibile posizionare gli utenti." << endl;
+				return 1;
+			}
+			else
+			{
+				//istanze speciali 
+				
+				do //TODO: renderla deterministica
+				{
+					chosenIndex = getRand(0, mapPool.bucket_count() - 1);
+				} 
+				while (mapPool.bucket_size(chosenIndex) == 0);
+
+				//alternativa, deterministica ma piu' lenta
+				//else: auto random_it = std::next(std::begin(edges), rand_between(0, edges.size()));
+				//auto element = next(begin(mapPool),getRand(0,mapPool.size()) );
+
+				//printBuckets(mapPool);
+				//getRand(0, mapPool.bucket_count() - 1);
+
+				//chosenValue = std::advance(mapPool.begin(chosenIndex), 1);
+				auto element = mapPool.begin(chosenIndex);
+				//advance(element, 0); non causa modifiche
+				int chosenValue = element->second;
+
+			
+				//randomize by bucket 
+
+				grid[chosenValue].isUser = true;
+				grid[chosenValue].id = i;
+
+				//cout << chosenValue << " " << grid[chosenValue].id << " " << grid[chosenValue].x << " " << grid[chosenValue].y << endl;
+				
+				//cout << "Ho scelto il nodo: " << chosenIndex << " " << chosenValue << " " << grid[chosenValue].x << " " << grid[chosenValue].y << endl;
+				
+				//NODIST
+				//cout << " cancello il nodo " << chosenIndex << endl;
+				//per ripristinare distanza, commentare istruzione dopo e rimuovere /* */
+				mapPool.erase(chosenIndex);
+				/*if (nodeRadius >= step)
+				{
+					int startX = max(0, grid[chosenValue].x - (step));
+					int startY = max(0, grid[chosenValue].y - (step));
+
+					int endX = min(grid[chosenValue].x + (step), (length - 1) * step);
+					int endY = min(grid[chosenValue].y + (step), (height - 1) * step);
+
+					// << "start(" << startX << " " << startY << ")" << endl;
+					//cout << "end(" << endX << " " << endY << ")" << endl;
+					for (int y = startY; y <= endY; y = y + step)
+					{
+						for (int x = startX; x <= endX; x = x + step)
+						{
+							//eliminazione dei nodi
+							double dst = getDistance(x, y, grid[chosenValue].x, grid[chosenValue].y);
+							//cout << "dist: " << "(" << x << "," << y << ") " << "(" << grid[chosenValue].x << "," << grid[chosenValue].y << ")" << " : " << dst << endl;
+							if (dst <= nodeRadius)
+							{
+								
+								int nodeId = (y / step) * length + (x / step);
+
+									
+								//cout << "sto per cancellare id: " << mapPool[nodeId][1] <<endl;
+								//cout << "sto per cancellare id: " << counter <<endl;
+								//mapPool.erase(mapPool.begin() + nodeId); 
+								//cout << "Sto per cancellare il nodo " << nodeId << endl;
+								mapPool.erase(nodeId);
+
+								//cout << "nodeId " << nodeId << " size: " << mapPool.size() << endl;
+								//int check = 0;
+								//for (auto& x : mapPool)
+								/{
+								//	if (nodeId == x.first)
+									//	check = 1;
+								//	cout << x.first << " ";
+								//}
+								//cout << endl;
+								//if (check == 0)
+									//cout << "Il nodo: " << nodeId << " e' stato eliminato." << endl;							
+							}
+						}
+					}
+					//cout << " cancello il nodo " << chosenIndex << endl;
+					mapPool.erase(chosenIndex);
+				}*/
+			}
+
+			//assegnazione id ai nodi P
+			int progressiveId = n;  
+			for(unsigned int i=0; i < grid.size(); i++)
+			{
+				if(grid[i].isUser == false)
+				{
+					grid[i].id = progressiveId;
+					progressiveId++;
+				}
+			}
+
+			
+			//filling the map
+			for(unsigned int i=0; i < grid.size(); i++)
+			{
+				int gridIndex = grid[i].id;
+
+				mapGrid[gridIndex].id = i;
+				mapGrid[gridIndex].isUser = grid[i].isUser; 
+				mapGrid[gridIndex].x = grid[i].x; 
+				mapGrid[gridIndex].y = grid[i].y; 
+			}
+		}
+		cout << "grid"<< endl;
+			 for(unsigned int i=0; i < grid.size(); i++)
+			{
+				cout << i <<") " << grid[i].id << endl;
+			}
+			
+		for(unsigned int i=0; i< mapGrid.size();i++)
+		{
+			cout<< i <<")"<<endl;
+			cout<< mapGrid[i].id <<endl;
+			cout<< mapGrid[i].isUser <<endl;
+			cout<< mapGrid[i].x <<endl;
+			cout<< mapGrid[i].y <<endl;
+		}
+		return 0;
+	}
+	else
+	{
+		cerr << __FUNCTION__ << "(): Uno o piu' parametri sono errati." << endl;
+		return 1;
+	}
+}
+
+/*static int placeUsersSere()
+{
+	if (grid.size() > 0 && n > 0)
+	{
+		unordered_map<int, int> mapPool;
+		int size = length * height;
+		
+		mapPool.reserve(size);
+		for (int i = 0; i < size; i++)
+		{
+			mapPool[i] = i;
+			grid[i].isUser = false;
+			grid[i].id = -1;
+		}
+		
+		//
+		
+		
+		//assegnazione id ai nodi P
+		int progressiveId = n;  
+		for(unsigned int i=0; i < grid.size(); i++)
+		{
+			if(grid[i].isUser == false)
+			{
+				grid[i].id = progressiveId;
+				progressiveId++;
+			}
+		}
+
+			
+		//filling the map
+		for(unsigned int i=0; i < grid.size(); i++)
+		{
+			int gridIndex = grid[i].id;
+
+			mapGrid[gridIndex].id = i;
+			mapGrid[gridIndex].isUser = grid[i].isUser; 
+			mapGrid[gridIndex].x = grid[i].x; 
+			mapGrid[gridIndex].y = grid[i].y; 
+		}
+	}
+	else
+	{
+		cerr << __FUNCTION__ << "(): Uno o piu' parametri sono errati." << endl;
+		return 1;
+	}
+}*/
+
 static int placeUsersSere()
 {
 	if (grid.size() > 0 && n > 0)
@@ -378,15 +588,15 @@ static int placeUsersSere()
 
 								//cout << "nodeId " << nodeId << " size: " << mapPool.size() << endl;
 								//int check = 0;
-								/*for (auto& x : mapPool)
-								{
-									if (nodeId == x.first)
-										check = 1;
-									cout << x.first << " ";
-								}*/
-								/*cout << endl;
-								if (check == 0)
-									cout << "Il nodo: " << nodeId << " e' stato eliminato." << endl;*/							
+								//for (auto& x : mapPool)
+								//{
+								//	if (nodeId == x.first)
+								//		check = 1;
+								//	cout << x.first << " ";
+								//}
+								//cout << endl;
+								//if (check == 0)
+								//	cout << "Il nodo: " << nodeId << " e' stato eliminato." << endl;							
 							}
 						}
 					}
@@ -405,6 +615,7 @@ static int placeUsersSere()
 					progressiveId++;
 				}
 			}
+			
 
 			
 			//filling the map
@@ -418,14 +629,15 @@ static int placeUsersSere()
 				mapGrid[gridIndex].y = grid[i].y; 
 			}
 		}
-		/*for(unsigned int i=0; i< mapGrid.size();i++)
-		{
-			cout<< i <<")"<<endl;
-			cout<< mapGrid[i].id <<endl;
-			cout<< mapGrid[i].isUser <<endl;
-			cout<< mapGrid[i].x <<endl;
-			cout<< mapGrid[i].y <<endl;
-		}*/
+		
+		//for(unsigned int i=0; i< mapGrid.size();i++)
+		//{
+		//	cout<< i <<")"<<endl;
+		//	cout<< mapGrid[i].id <<endl;
+		//	cout<< mapGrid[i].isUser <<endl;
+		//	cout<< mapGrid[i].x <<endl;
+		//	cout<< mapGrid[i].y <<endl;
+		//}
 		return 0;
 	}
 	else
@@ -434,6 +646,7 @@ static int placeUsersSere()
 		return 1;
 	}
 }
+
 
 //alloca e popola un vettore per ospitare le coordinate di tutti i punti 
 static int createGrid()
@@ -502,14 +715,14 @@ static int initDataStructures(int n, int d, int P)
 			deployCost.resize(P, -1);
 
 			//matrice 3D (n+P)x(n+P)x(K), init=DISCONNECTED_COST
-			c.resize(totalPotentialNodes);
+			//c.resize(totalPotentialNodes); NOCOST
 			for (int i = 0; i < totalPotentialNodes; i++)
 			{
-				c[i].resize(totalPotentialNodes);
+				/*c[i].resize(totalPotentialNodes); NOCOST
 				for (int j = 0; j < totalPotentialNodes; j++)
 				{
 					c[i][j].resize(K, DISCONNECTED_COST);
-				}
+				}*/
 			}
 
 			//matrice (n+P)x(K), init=0
@@ -561,7 +774,7 @@ static void randomizeTraffic(int minVal, int maxVal)
 	}
 }
 
-static void randomizeCosts(double minCVal, double maxCVal, int radius)
+/*static void randomizeCosts(double minCVal, double maxCVal, int radius) NOCOST
 {
 	if (c.size() > 0 && grid.size() > 0)
 	{
@@ -587,7 +800,7 @@ static void randomizeCosts(double minCVal, double maxCVal, int radius)
 	{
 		cerr << __FUNCTION__ << "(): Strutture dati non allocate." << endl;
 	}
-}
+}*/
 
 static void randomizeDeployCost(double minVal, double maxVal)
 {
@@ -638,10 +851,11 @@ static int createRandomInstance(int users, int drones, int tInf, int tSup, doubl
 		if(result==0)
 		{
 			//TODO
-			int trials = 50;
+			int trials = 400;
 			do
 			{
-				result = placeUsersSere();
+				//result = placeUsersSere(); 
+				result = placeUsersFallback();
 				trials--;
 			}
 			while(result != 0 && trials > 0 );
@@ -654,7 +868,7 @@ static int createRandomInstance(int users, int drones, int tInf, int tSup, doubl
 			if(result == 0)
 			{
 				randomizeTraffic(tInf,tSup);
-				randomizeCosts(cInf,cSup,nodeRadius);
+				//randomizeCosts(cInf,cSup,nodeRadius); NOCOST
 				randomizeDeployCost(dInf,dSup);
 				buildInterferenceMatrix(); //richiede griglia e utenti gia' posizionati
 
@@ -689,14 +903,41 @@ static int createRandomInstance(int users, int drones, int tInf, int tSup, doubl
 	return result;
 }
 
-int createBatchInstances(int instQuantity, vector<int> users, vector<int> drones, vector<int> gridLength, vector<int> gridHeight, vector<int> gridStep, int tInf, int tSup, double cInf, double cSup, double dInf, double dSup, string instRootName)
+int createBatchInstances(int instQuantity, vector<int> users, vector<int> drones, vector<int> gridLength, vector<int> gridHeight, vector<int> gridStep, int tInf, int tSup, double cInf, double cSup, double dInf, double dSup, string instRootName, string folderName)
 {
 	if (instQuantity > 0) //&& (users.size() == drones.size() && drones.size() == positions.size() && positions.size() == gridLength.size() && gridLength.size() == gridHeight.size() && gridHeight.size() == gridStep.size()))
 	{
 		int result = 0;
 		ofstream file;
-		string fileName(INSTANCE_PATH);
+		
+		string mkd("mkdir ");
+		string variation( to_string(users[0]) + "_" + to_string( gridLength[0] * gridHeight[0]) );
+		
+		int status = system( (mkd + folderName).c_str());
+		cout << "mkdir executed with code: " << status << endl;
+		//string fileName(INSTANCE_PATH); DATASET
+		string fileName(folderName); 
 		fileName = fileName + MASTER_FILE;
+		
+		string command1("./main -a ../");
+		
+		string exename1("INT");
+		string home1("nodistESATTO");
+		string home2("nodistEURIST");
+		
+		string filepath1(home1 + "/" +variation+ "/i01");
+		int time = 5;
+		if(printClusterJob("main.job",(folderName), (exename1 + variation), filepath1, command1, variation, home1, time) == false)
+			cerr << __FUNCTION__ << "(): Impossibile creare file di job." <<endl;
+			
+		string command2("./main -X ../");
+		string exename2("HEU");
+		string filepath2(home2 +"/" +variation + "/h01");
+		time = 50;
+		
+		if(printClusterJob("mainH.job",(folderName), (exename2 + variation), filepath2, command2, variation, home2, time) == false)
+			cerr << __FUNCTION__ << "(): Impossibile creare file di job." <<endl;
+		
 		file.open(fileName, ios::out);
 		if (file.is_open())
 		{
@@ -708,7 +949,8 @@ int createBatchInstances(int instQuantity, vector<int> users, vector<int> drones
 					{
 						for (int j = 0; j < instQuantity; j++)
 						{
-							string composeName = INSTANCE_PATH + instRootName + "_i" + to_string(j) + "_u" + to_string(users[i]) + "_d" + to_string(drones[l]) + "_p" + to_string(gridHeight[k] * gridLength[k]) + ".txt";
+							//string composeName = INSTANCE_PATH + instRootName + "_i" + to_string(j) + "_u" + to_string(users[i]) + "_d" + to_string(drones[l]) + "_p" + to_string(gridHeight[k] * gridLength[k]) + ".txt"; DATASET
+							string composeName = folderName + instRootName + "_i" + to_string(j) + "_u" + to_string(users[i]) + "_d" + to_string(drones[l]) + "_p" + to_string(gridHeight[k] * gridLength[k]) + ".txt";
 							result = createRandomInstance(users[i], drones[l], tInf, tSup, cInf, cSup, dInf, dSup, gridLength[k], gridHeight[k], gridStep[k], composeName);
 							if (result != 0)
 							{
@@ -773,7 +1015,7 @@ int saveInstance(const char *filename)
 				file << endl;
 			}
 
-			for (unsigned int i = 0; i < c.size(); i++)
+			/*for (unsigned int i = 0; i < c.size(); i++) NOCOST
 			{
 				for (unsigned int j = 0; j < c[0].size(); j++)
 				{
@@ -791,7 +1033,7 @@ int saveInstance(const char *filename)
 					}
 					file << endl;
 				}
-			}
+			}*/
 
 			for(int i = 0; i< totalPotentialNodes; i++)
 			{
@@ -836,7 +1078,7 @@ int loadInstance(const char *filename)
 	int result = 0;
 	ifstream file;
 	
-	long int sparseCounter = 0, nnzCounter = 0; //debug
+	//long int sparseCounter = 0, nnzCounter = 0; //debug
 
 	n = 0, d = 0, P = 0;
 	totalNodes = 0;
@@ -872,7 +1114,7 @@ int loadInstance(const char *filename)
 						}
 					}
 
-					for (unsigned int i = 0; i < c.size(); i++)
+					/*for (unsigned int i = 0; i < c.size(); i++) NOCOUNT
 					{
 						for (unsigned int j = 0; j < c[0].size(); j++)
 						{
@@ -899,7 +1141,7 @@ int loadInstance(const char *filename)
 						}
 					}
 					
-					cout << "Zero / Non-Zero elements in matrix C: " << sparseCounter << " / " << nnzCounter << endl; //debug
+					cout << "Zero / Non-Zero elements in matrix C: " << sparseCounter << " / " << nnzCounter << endl; //debug */
 	
 					for(int i = 0; i< totalPotentialNodes; i++)
 					{

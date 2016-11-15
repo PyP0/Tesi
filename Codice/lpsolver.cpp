@@ -47,12 +47,18 @@ vector <int> yIDX;
 vector <int> xIDX;
 vector <int> zIDX;
 vector <int> superaIDX;
+vector <int> fIDX;
+vector <int> sIDX;
 
 int bigM = 1000000; //default value
 
 static bool areOutOfSight(int i, int j) //TODO: controllarne effettiva funzionalita'
 {
-	int k = 0;
+	if(getDistance(mapGrid[i].x, mapGrid[i].y, mapGrid[j].x, mapGrid[j].y) <= getNodeRadius())
+		return false;
+	else
+		return true;
+	/*int k = 0; NOCOST
 	bool flag = true;
 	if (isCEmpty() == false) //c e' gia' stato allocato?
 	{
@@ -68,7 +74,7 @@ static bool areOutOfSight(int i, int j) //TODO: controllarne effettiva funzional
 		flag = false;
 		cerr << __FUNCTION__ << "(): Struttura dati non allocata." << endl;
 	}
-	return flag;
+	return flag;*/
 }
 
 int gety_index()
@@ -80,7 +86,7 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 {
 
 	const double zero = 0.0;
-	const double uno = 1.0;
+	//const double uno = 1.0;
 
 	cout << "Current memory usage, pre-model: " << getCurrentRSS( ) / 1024 << "KB" << endl;
 	//allocazione mappe
@@ -116,12 +122,15 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 			{
 
 				//if (i != j) //c'è un arco tra i nodi i e j, quindi creo la corrispondente variabile di flusso fijk
-				if (i != j && (getCost(i,j,k) <= getThreshold()) && !(i < getUsrsNum() && j < getUsrsNum())) //***
+				//if (i != j && (getCost(i,j,k) <= getThreshold()) && !(i < getUsrsNum() && j < getUsrsNum())) //*** NOCOST
+				
+				
+				if (i != j && (getDistance(mapGrid[i].x, mapGrid[i].y, mapGrid[j].x, mapGrid[j].y) <= getNodeRadius()) && !(i < getUsrsNum() && j < getUsrsNum()))
 				{		
 					double lb = 0.0;
 					double ub = CPX_INFBOUND;
 					
-					double cost = getCost(i,j,k);
+					//double cost = getCost(i,j,k); NOCOST
 					
 					snprintf(name, NAME_SIZE, "f_%d_%d_%d", i, j, k); //scrive il nome della variabile f_i_j_k sulla stringa name[]
 					char* fname = (char*)(&name[0]);
@@ -328,10 +337,10 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 	cout << "Sono state create " << numsuperaVars << " variabili sp_i" << endl;  //numero totale delle vars create
 
 	
-	/*if(contRelax[0] == 31) //cambia tipo del problema
+	if(contRelax[0] == 31) //cambia tipo del problema
 	{
 		CPXchgprobtype(env, lp, CPXPROB_LP);
-	}*/
+	}
 
 	// 1.0 addition //
 
@@ -346,11 +355,16 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 	xIDX.resize(numxVars);
 	zIDX.resize(numzVars);
 	superaIDX.resize(numsuperaVars);
+	fIDX.resize(numfVars);
+	sIDX.resize(numsVars);
 	
 	iota(yIDX.begin(), yIDX.end(), y_index);
 	iota(xIDX.begin(), xIDX.end(), x_index);
 	iota(zIDX.begin(), zIDX.end(), z_index);
 	iota(superaIDX.begin(), superaIDX.end(), supera_index);
+	iota(fIDX.begin(), fIDX.end(), f_index);
+	iota(sIDX.begin(), sIDX.end(), s_index);
+	
 	//=========================================================================
 	//=========================================================================
 	//									vincoli
@@ -513,7 +527,7 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 
 		}
 	}
-	//cout << "Vincoli (8) creati\n";
+	//cout << "Vincoli (1) creati\n";
 
 	// 2. vers 1.0  Sum(f_ijk) <= M * x_ij (12)
 	//bigM = max(getRXCapacity(),getTXCapacity()); 
@@ -709,7 +723,7 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 			}
 		}
 	}*/
-	//cout << "Vincoli (12) creati\n" << endl;
+	//cout << "Vincoli (2) creati\n" << endl;
 
 
 	// 3. legame tra variabili x_i_j e y_j (9)
@@ -754,7 +768,7 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 		}
 	}
 
-	//cout << "Vincoli (9) creati\n";
+	//cout << "Vincoli (3) creati\n";
 
 	// 4. non posizionare piu' di d droni (11)
 	double temp_d = (double)getDrnsNum();
@@ -776,7 +790,7 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 	idx.clear();
 	coef.clear();
 
-	//cout << "Vincoli (11) creati\n";
+	//cout << "Vincoli (4) creati\n";
 
 	// 5.  Sum(f_jik) <= U_rx * y_i - s_i  (1)
 	sense = 'L'; 
@@ -814,7 +828,7 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 		idx.clear();
 		coef.clear();
 	}	
-	//cout << "Vincoli (1) creati\n";
+	//cout << "Vincoli (5) creati\n";
 
 	// 5.a Sum(f_jik) <= U_rx - s_i
 
@@ -852,7 +866,7 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 		idx.clear();
 		coef.clear();
 	}
-	//cout << "Vincoli (1.a) creati\n";
+	//cout << "Vincoli (5.a) creati\n";
 
 	// 6. s_i >= S_max * z_i (2)
 
@@ -1589,6 +1603,51 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 	}*/
 	//cout << "Vincoli (10) creati\n";
 
+
+	//istanze speciali
+
+	//btn25
+	//vector<int> noFlightZones {0,1,3,4,5,7,8,9,13,17,27,31,35,36,37,39,40,41,43,44};
+
+	//btn41
+	//vector<int> noFlightZones {0,1,4,5,6,7,8,9,10,11,12,13,14,15,20,21,22,23,24,25,26,28,29,36,37,40,44,60,65,66,67,68,69,70,74,75,76,79,80,81,82,83,84,85,86,88,88};
+	
+	//btn48
+	//vector<int> noFlightZones {19,20,24,26,27,28,29,31,32,34,35,36,37,39,43,44};
+
+	/*vector <char> lb(1, 'L');
+	vector <char> ub(1, 'U');
+	vector <double> zeros(1, 0.0);
+	 
+	
+		
+		
+	for(int i = 0 ; i< (int)noFlightZones.size(); i++)
+	{
+		int j=0;
+		int offset = 0;
+		cout << "cerco pos: " << noFlightZones[i] << endl;
+		while( mapGrid[j].id != noFlightZones[i])
+		{
+			cout << "mapGrid[" <<j <<"].id =" << mapGrid[j].id << endl;
+			if(mapGrid[j].isUser != true)
+			{
+				offset++;
+			}
+			j++;
+		}
+		cout << "*mapGrid[" <<j <<"].id =" << mapGrid[j].id << endl;
+		cout << "scelto offset: " << offset << endl;
+		int indY = y_index + offset ;
+		cout << "indY = " << indY << endl;
+		CHECKED_CPX_CALL(CPXchgbds, env, lp, 1, &indY, &lb[0], &zeros[0]);
+		CHECKED_CPX_CALL(CPXchgbds, env, lp, 1, &indY, &ub[0], &zeros[0]);
+	}*/
+	 
+	
+
+
+
 	cout << "Max physical memory usage at model creation: " << getPeakRSS( ) << " KB" << endl;
 	cout << "Current memory usage, post-model: " << getCurrentRSS( ) / 1024 << "KB" << endl;
 
@@ -1631,6 +1690,7 @@ void printSolution(solution_t *solution)
 		cout << endl << "Soluzione istanza: " << endl;
 		cout << "Valore f. obiettivo: " << solution->objValue << endl;
 		cout << "Tempo totale impiegato (ms): " << solution->execTime << endl;
+		cout << "Nodi esplorati: " << solution->openedNodes << endl;
 		for (int i = 0; i < getPosNum() - getUsrsNum(); i++)
 		{
 			if (round(solution->yPositions[i]) == 1)
@@ -1658,6 +1718,7 @@ void printRelaxedSolution(solution_t *solution)
 		cout << endl << "*Soluzione istanza: " << endl;
 		cout << "*Valore f. obiettivo: " << solution->objValue << endl;
 		cout << "*Tempo totale impiegato (ms): " << solution->execTime << endl;
+		cout << "*Nodi esplorati: " << solution->openedNodes << endl;
 		for (int i = 0; i < getPosNum() - getUsrsNum(); i++)
 		{
 			if (solution->yPositions[i] > 0)
@@ -1697,9 +1758,24 @@ solution_t *solveLP(CEnv env, Prob lp, string baseFileName, bool verbose, int co
 	std::time_t timestamp = std::chrono::system_clock::to_time_t(start);
 	cout << "Optimization started at: " << std::ctime(&timestamp) << endl;
 	
-	start = std::chrono::high_resolution_clock::now(); //timestamp di inizio
+	if(contRelax[0]!= 31) //MIP  LPOPT
+	{
+		start = std::chrono::high_resolution_clock::now(); //timestamp di inizio
+			CHECKED_CPX_CALL(CPXmipopt, env, lp);
+		end = std::chrono::high_resolution_clock::now(); //timestamp di fine
+	}
+	else //LP
+	{
+		swapToCont(env,lp);
+		//cout << "qui" << endl;
+		start = std::chrono::high_resolution_clock::now(); //timestamp di inizio
+			CHECKED_CPX_CALL(CPXlpopt, env, lp);
+		end = std::chrono::high_resolution_clock::now(); //timestamp di fine
+		//cout << " quil" << endl;
+	}
+	/*start = std::chrono::high_resolution_clock::now(); //timestamp di inizio
 		CHECKED_CPX_CALL(CPXmipopt, env, lp);
-	end = std::chrono::high_resolution_clock::now(); //timestamp di fine
+	end = std::chrono::high_resolution_clock::now();*/ //timestamp di fine
 	
 	timestamp = std::chrono::system_clock::to_time_t(end); //debug: output timestamp 
 	cout << "Optimization finished at: " << std::ctime(&timestamp) << endl;
@@ -1725,6 +1801,7 @@ solution_t *solveLP(CEnv env, Prob lp, string baseFileName, bool verbose, int co
 		solution->objValue = objval;
 		solution->statusCode = CPXgetstat(env, lp);
 		solution->execTime = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+		solution->openedNodes = CPXgetnodecnt(env,lp);
 
 		int status = CPXgetx(env, lp, solutionArray, y_index, y_index + getTotalPotentialNodes() - getUsrsNum() - 1);
 		if (status == 0)
@@ -1764,7 +1841,7 @@ solution_t *solveHeurLP(CEnv env, Prob lp, string baseFileName, bool verbose, in
 		{
 			// risolve MIP con rilassamento continuo
 			instSolution = solveLP(env, lp, baseFileName, verbose, contRelax);  
-			CHECKED_CPX_CALL(CPXsolwrite, env, lp, (baseFileName+ ".sol.relaxed").c_str()); //debug, remove after
+			//CHECKED_CPX_CALL(CPXsolwrite, env, lp, (baseFileName+ ".sol.relaxed").c_str()); //debug, remove after
 			
 			if(instSolution != NULL)
 			{
@@ -1829,9 +1906,23 @@ solution_t *solveHeurLP(CEnv env, Prob lp, string baseFileName, bool verbose, in
 						std::time_t timestamp = std::chrono::system_clock::to_time_t(start);
 					cout << "Optimization started at: " << std::ctime(&timestamp) << endl;
 					
-					start = std::chrono::high_resolution_clock::now(); //timestamp di inizio
-						CHECKED_CPX_CALL(CPXmipopt, env, lp);
-					end = std::chrono::high_resolution_clock::now(); //timestamp di fine
+					if(contRelax[0] != 31) //LPOPT
+					{
+						start = std::chrono::high_resolution_clock::now(); //timestamp di inizio
+							CHECKED_CPX_CALL(CPXmipopt, env, lp);
+						end = std::chrono::high_resolution_clock::now(); //timestamp di fine
+					}
+					else
+					{
+						//cout << "qui" << endl;
+						start = std::chrono::high_resolution_clock::now(); //timestamp di inizio
+							CHECKED_CPX_CALL(CPXlpopt, env, lp);
+						end = std::chrono::high_resolution_clock::now(); //timestamp di fine
+						//cout << " qui1" << endl;
+					}
+					/*start = std::chrono::high_resolution_clock::now(); //timestamp di inizio
+							CHECKED_CPX_CALL(CPXmipopt, env, lp);
+						end = std::chrono::high_resolution_clock::now(); *///timestamp di fine
 					
 					timestamp = std::chrono::system_clock::to_time_t(end); //debug: output timestamp 
 					cout << "Optimization finished at: " << std::ctime(&timestamp) << endl;
@@ -1914,7 +2005,7 @@ solution_t *solveHeurLP(CEnv env, Prob lp, string baseFileName, bool verbose, in
 						printSimplifiedSolFile(env, lp, (baseFileName + ".txt").c_str());
 						printVarsValue(env, lp);
 					}
-					CHECKED_CPX_CALL(CPXsolwrite, env, lp, (baseFileName + ".sol").c_str());
+					//CHECKED_CPX_CALL(CPXsolwrite, env, lp, (baseFileName + ".sol").c_str());
 				}
 			}
 			else
@@ -1947,6 +2038,54 @@ solution_t *getSolution(CEnv env, Prob lp, unsigned long int execTime, string in
 		instSolution->statusCode = CPXgetstat(env, lp);
 		instSolution->execTime = execTime;
 		instSolution->yPositions.clear();
+
+		instSolution->openedNodes =  CPXgetnodecnt(env, lp);
+
+		int status = CPXgetx(env, lp, solutionArray, gety_index(), gety_index() + getTotalPotentialNodes() - getUsrsNum() - 1);
+		if (status == 0)
+		{
+			instSolution->yPositions.resize(size - getUsrsNum());
+			for (int i = 0; i < size - getUsrsNum() ; i++)
+			{
+				instSolution->yPositions[i] = solutionArray[i];
+			}
+			//solution->yPositions(solutionArray, solutionArray + sizeof(solutionArray) / sizeof (solutionArray[0]) );
+		}
+		else
+		{
+			//return vettore vuoto
+			instSolution->yPositions = vector<double>();
+		}	
+		return instSolution;
+	}
+	catch (exception& e)
+	{
+		cerr << __FUNCTION__ << "(): An exception has occurred: " << e.what() << endl;
+		if(instSolution != NULL)
+			delete instSolution;
+		return NULL;
+	}		
+}
+
+solution_t *getHeurSolution(CEnv env, Prob lp, unsigned long int execTime, string instanceName, int iterations)
+{
+	solution_t *instSolution = NULL;
+	try
+	{
+		instSolution = new solution_t;
+		double objval = 0.0;
+		const int size = getPosNum();
+		double solutionArray[size];
+
+		CHECKED_CPX_CALL(CPXgetobjval, env, lp, &objval);
+
+		instSolution->instName = instanceName;
+		instSolution->objValue = objval;
+		instSolution->statusCode = CPXgetstat(env, lp);
+		instSolution->execTime = execTime;
+		instSolution->yPositions.clear();
+
+		instSolution->heurIterationCount = iterations;
 
 		int status = CPXgetx(env, lp, solutionArray, gety_index(), gety_index() + getTotalPotentialNodes() - getUsrsNum() - 1);
 		if (status == 0)
@@ -2222,6 +2361,8 @@ void printSimplifiedSolFile(CEnv env, Prob lp, const char* solution)
 
 void swapToInt(CEnv env, Prob lp)
 {
+	CPXchgprobtype (env, lp, CPXPROB_MILP);//LPOPT
+	
 	vector <char> ynewType(numyVars, 'B');
 	vector <char> xnewType(numxVars, 'B');
 	vector <char> znewType(numzVars, 'B');
@@ -2231,11 +2372,36 @@ void swapToInt(CEnv env, Prob lp)
 	CHECKED_CPX_CALL(CPXchgctype, env, lp, numxVars, &xIDX[0], &xnewType[0]);
 	CHECKED_CPX_CALL(CPXchgctype, env, lp, numzVars, &zIDX[0], &znewType[0]);
 	CHECKED_CPX_CALL(CPXchgctype, env, lp, numsuperaVars, &superaIDX[0], &superanewType[0]);
+	
+	/*vector <double> ones(max(xIDX.size(), fIDX.size()), 1.0); //LPOPT
+	vector <double> zeros(max(xIDX.size(), fIDX.size()), 0.0);
+	vector <char> lb(max(xIDX.size(), fIDX.size()), 'L');
+	vector <char> ub(max(xIDX.size(), fIDX.size()), 'U');
+	
+	//binaries 
+	CHECKED_CPX_CALL(CPXchgbds, env, lp, yIDX.size(), &yIDX[0], &lb[0], &zeros[0]);
+	CHECKED_CPX_CALL(CPXchgbds, env, lp, yIDX.size(), &yIDX[0], &ub[0], &ones[0]);
+	
+	
+	CHECKED_CPX_CALL(CPXchgbds, env, lp, xIDX.size(), &xIDX[0], &lb[0], &zeros[0]);
+	CHECKED_CPX_CALL(CPXchgbds, env, lp, xIDX.size(), &xIDX[0], &ub[0], &ones[0]);
+	
+	CHECKED_CPX_CALL(CPXchgbds, env, lp, zIDX.size(), &zIDX[0], &lb[0], &zeros[0]);
+	CHECKED_CPX_CALL(CPXchgbds, env, lp, zIDX.size(), &zIDX[0], &ub[0], &ones[0]);
+	
+	CHECKED_CPX_CALL(CPXchgbds, env, lp, superaIDX.size(), &superaIDX[0], &lb[0], &zeros[0]);
+	CHECKED_CPX_CALL(CPXchgbds, env, lp, superaIDX.size(), &superaIDX[0], &ub[0], &ones[0]);
+	
+	//LB of continuous
+	CHECKED_CPX_CALL(CPXchgbds, env, lp, fIDX.size(), &fIDX[0], &lb[0], &zeros[0]);
+	
+	CHECKED_CPX_CALL(CPXchgbds, env, lp, sIDX.size(), &sIDX[0], &lb[0], &zeros[0]);*/
+
 }
 
 void swapToCont(CEnv env, Prob lp)
 {
-	vector <char> ynewType(numyVars, 'C');
+	/*vector <char> ynewType(numyVars, 'C');
 	vector <char> xnewType(numxVars, 'C');
 	vector <char> znewType(numzVars, 'C');
 	vector <char> superanewType(numsuperaVars, 'C');
@@ -2243,5 +2409,8 @@ void swapToCont(CEnv env, Prob lp)
 	CHECKED_CPX_CALL(CPXchgctype, env, lp, numyVars, &yIDX[0], &ynewType[0]);
 	CHECKED_CPX_CALL(CPXchgctype, env, lp, numxVars, &xIDX[0], &xnewType[0]);
 	CHECKED_CPX_CALL(CPXchgctype, env, lp, numzVars, &zIDX[0], &znewType[0]);
-	CHECKED_CPX_CALL(CPXchgctype, env, lp, numsuperaVars, &superaIDX[0], &superanewType[0]);
+	CHECKED_CPX_CALL(CPXchgctype, env, lp, numsuperaVars, &superaIDX[0], &superanewType[0]);*/
+	
+	
+	CPXchgprobtype (env, lp, CPXPROB_LP) ;//LPOPT 
 }

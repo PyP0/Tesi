@@ -13,7 +13,11 @@ double pathlossExp_ = 2.0; //TODO: check
 double Pt = 0.2818;
 double lambda = 0.06;
 //double rxThresh = 7.13904e-07;//2.32413e-06; //1.02802e-10; //250m //1.69063e-06; //3m //
-double rxThresh = 1.53428e-10; //150m DATASET
+//double rxThresh = 1.53428e-10; //150m DATASET
+//double rxThresh = 6.42514e-10; //0.5 @100m @5GHz DATASET2 
+//double rxThresh = 1.02802e-10; //0.5 @250m @5GHz DATASET
+double rxThresh = 2.57006e-09; //0.5 @50m @5GHz DATASET3
+
 
 double getRXThresh()
 {

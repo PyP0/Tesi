@@ -16,11 +16,19 @@ struct solution_t
 	int statusCode;
 	unsigned long int execTime;
 
+	unsigned long int openedNodes;
+	double rootGap;
+
+	int heurIterationCount;
+
 };
 
 int gety_index();
 
 solution_t *getSolution(CEnv,Prob,unsigned long int,std::string);
+
+solution_t *getHeurSolution(CEnv,Prob,unsigned long int,std::string,int);
+
 void printVarsValue(CEnv, Prob);
 //solution_t *getSolution(CEnv, Prob);
 void printSolution(solution_t*);

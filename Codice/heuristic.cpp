@@ -19,6 +19,14 @@
 
 using namespace std;
 
+bool solutionExists(int code)
+{
+	if(code != 3 && code != 4 && code != 103 && code != 106 && code != 108 && code != 110 && code != 112 && code != 114 && code != 117 && code !=  119) //soluzione intera trovata: stop
+		return true;
+	else
+		return false;
+}
+
 double evaluate(solution_t *currentSol)
 {
 	double objF = 0.0;
@@ -39,8 +47,19 @@ solution_t *startingSolution(CEnv env, Prob lp, string instanceName, int contRel
 
 	solution_t *instSolution = NULL;
 	//heurSolution_t *firstSolution = NULL;
+	std::chrono::high_resolution_clock::time_point start, end;
 
-	instSolution = solveLP(env, lp, instanceName, verbose, contRelax);
+	
+	start = std::chrono::high_resolution_clock::now(); //timestamp di inizio
+		instSolution = solveLP(env, lp, instanceName, verbose, contRelax);
+	end = std::chrono::high_resolution_clock::now(); //timestamp di fine
+
+	cout << "Soluzione iniziale trovata in "
+		<< std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() //casting per la conversione in millisecondi; (end-start).count() calcola la differenza di tempo e la restituisce come valore numerico
+		<< "ms" << " (" << std::chrono::duration_cast<std::chrono::seconds>(end - start).count() << "s c.ca).\n";
+
+	//swapToInt(env,lp);
+
 	if(instSolution != NULL)
 	{
 		if (instSolution->statusCode == 103) //CPXMIP_INFEASIBLE 
@@ -53,6 +72,8 @@ solution_t *startingSolution(CEnv env, Prob lp, string instanceName, int contRel
 		}
 		else
 		{
+			CPXwriteprob( env, lp, (instanceName + "INIT.lp").c_str(), NULL);
+			//CHECKED_CPX_CALL(CPXsolwrite, env, lp, (instanceName + "INIT.sol").c_str());
 			return instSolution;
 			/*vector< double > yValue;
 			vector< int > yIndexes;
@@ -187,7 +208,7 @@ solution_t *executeHeurInstance(string fileName, bool verbose, int contRelax[])
 							printSolution(instSolution);
 					}
 
-					//if(verbose == true)
+					if(verbose == true)
 						CHECKED_CPX_CALL(CPXsolwrite, env, lp, solFile.c_str());
 				}
 			}
@@ -218,6 +239,8 @@ solution_t *solve2(CEnv env, Prob lp, string instance, bool verbose)
 	int contRelax[] = {31};
 	std::chrono::high_resolution_clock::time_point start, end;
 
+	std::chrono::high_resolution_clock::time_point startPartial, endPartial;
+
 	vector< double > firstSolutionArray(getTotalPotentialNodes() - getUsrsNum());
 	vector< pair< int,double > > Y(getTotalPotentialNodes() - getUsrsNum()); //insieme delle y_i. Coppia indice variabile - valore
 	
@@ -227,6 +250,8 @@ solution_t *solve2(CEnv env, Prob lp, string instance, bool verbose)
 	vector <double> zeros(1, 0.0);
 		
 	bool stop = false;
+
+	int iterations = 1;
 
 	start = std::chrono::high_resolution_clock::now(); //timestamp di inizio
 
@@ -300,17 +325,30 @@ solution_t *solve2(CEnv env, Prob lp, string instance, bool verbose)
 				CHECKED_CPX_CALL(CPXchgbds, env, lp, 1, &YchosenIndex, &ub[0], &zeros[0]);
 			}
 			
-			if(verbose == true)	
-				CPXwriteprob( env, lp, (instance + "." + to_string(Y[Ychosen].first) + ".cont.lp").c_str(), NULL);
+			//if(verbose == true)	
+			//CPXwriteprob( env, lp, (instance + "." + to_string(Y[Ychosen].first) + ".cont.lp").c_str(), NULL);
 			
 			//esegue LP rilassato
-			CPXmipopt(env, lp); 
+			//CPXmipopt(env, lp); 
+
+			//swaptocont già fatta da soluzione iniziale
+			startPartial = std::chrono::high_resolution_clock::now(); //timestamp di inizio
+				CPXlpopt(env,lp); //LPOPT
+			endPartial = std::chrono::high_resolution_clock::now(); //timestamp di fine
+
+			cout << "***LPOPT iterazione: " << iterations 
+			    << " terminato in "
+				<< std::chrono::duration_cast<std::chrono::milliseconds>(endPartial - startPartial).count() //casting per la conversione in millisecondi; (end-start).count() calcola la differenza di tempo e la restituisce come valore numerico
+				<< "ms" << " (" << std::chrono::duration_cast<std::chrono::seconds>(endPartial - startPartial).count() << "s c.ca).\n";
+
 			int optStat = CPXgetstat(env, lp);
 			
-			if(optStat == 101 || optStat == 102) //soluzione rilassata trovata
+			if(solutionExists(optStat) == true) //soluzione rilassata trovata
 			{
+				//CPXsolwrite(env, lp, (instance + ".lpopt.sol").c_str());
 				if(verbose == true)	
 				{
+					
 					cout << "Soluzione rilassata trovata con: ";
 					for(int i = 0; i < Yiterator; i++)
 					{
@@ -319,24 +357,35 @@ solution_t *solve2(CEnv env, Prob lp, string instance, bool verbose)
 					cout << endl;
 				}
 				//esegui LP intero
-				if(verbose == true)	
-					CPXwriteprob( env, lp, (instance + ".cont.lp").c_str(), NULL);
+				//if(verbose == true)	
+				//	CPXwriteprob( env, lp, (instance + ".cont.lp").c_str(), NULL);
 				
 				swapToInt(env, lp);
 
-				if(verbose == true)	
-					CPXwriteprob( env, lp, (instance + ".int.lp").c_str(), NULL);
+				//if(verbose == true)	
+				//	CPXwriteprob( env, lp, (instance + ".int.lp").c_str(), NULL);
 				
-				CPXmipopt(env, lp);
+				startPartial = std::chrono::high_resolution_clock::now(); //timestamp di inizio
+					CPXmipopt(env, lp); //LPOPT
+				endPartial = std::chrono::high_resolution_clock::now(); //timestamp di fine
+
+				cout << "***MIPOPT iterazione: " << iterations 
+			   		<< " terminato in "
+					<< std::chrono::duration_cast<std::chrono::milliseconds>(endPartial - startPartial).count() //casting per la conversione in millisecondi; (end-start).count() calcola la differenza di tempo e la restituisce come valore numerico
+					<< "ms" << " (" << std::chrono::duration_cast<std::chrono::seconds>(endPartial - startPartial).count() << "s c.ca).\n";
+
+
+				
 				
 				int linOptStat = CPXgetstat(env, lp);
-				if(linOptStat == 101 || linOptStat == 102) //soluzione intera trovata: stop
+				if(solutionExists(linOptStat) == true) //soluzione intera trovata: stop
 				{
 					stop = true;
 					end = std::chrono::high_resolution_clock::now(); //timestamp di fine
 		
 					if(verbose == true)	
-						{cout << "Soluzione intera trovata con ";
+					{
+						cout << "Soluzione intera trovata con ";
 						for(int i = 0; i < Yiterator; i++)
 						{
 							cout << "y_" << Y[i].first << " ";
@@ -345,7 +394,7 @@ solution_t *solve2(CEnv env, Prob lp, string instance, bool verbose)
 					}
 					
 					//aggiorna la soluzione
-					solution = getSolution(env, lp, std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count(), instance);
+					solution = getHeurSolution(env, lp, std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count(), instance, iterations);
 					if(solution == NULL)
 					{
 						cerr << __FUNCTION__ << "(): Impossibile recuperare la soluzione dell'istanza " << instance << endl;
@@ -358,8 +407,8 @@ solution_t *solve2(CEnv env, Prob lp, string instance, bool verbose)
 						return NULL;
 					}
 					
-					if(verbose == true)	
-						CPXsolwrite(env, lp, (instance + ".int.sol").c_str());
+					//if(verbose == true)	
+					//	CPXsolwrite(env, lp, (instance + ".int.sol").c_str());
 				}
 				else //non c'e' soluzione intera, aggiungi nuova y
 				{
@@ -400,6 +449,8 @@ solution_t *solve2(CEnv env, Prob lp, string instance, bool verbose)
 				if(verbose == true)	
 					cout << "Ho scelto indice " << Ychosen << ", cioe' var y_" << Y[Ychosen].first << " con valore: " << Y[Ychosen].second << endl;
 			}
+
+			iterations++;
 		}
 		if(stop == false)
 		{
@@ -408,15 +459,234 @@ solution_t *solve2(CEnv env, Prob lp, string instance, bool verbose)
 		}
 		else
 		{
+			CPXsolwrite(env, lp, (instance + ".solve2"  + ".sol").c_str());
 			return solution;
 		}
 	}
 }
 
+/*
 solution_t *solve(CEnv env, Prob lp, string instance, bool verbose)
 {
 	int contRelax[] = {31};
 	std::chrono::high_resolution_clock::time_point start, end;
+	std::chrono::high_resolution_clock::time_point startPartial, endPartial;
+
+	bool stop = false;
+
+	double threshold = 1.0;
+	double step = 0.01;
+
+	double mid = threshold ;
+
+
+	double stopValue = step;
+
+	double left, right;
+
+
+	vector< int > yIndexes;
+	vector< double > solutionArray(getTotalPotentialNodes() - getUsrsNum());
+	vector< double > firstSolutionArray(getTotalPotentialNodes() - getUsrsNum());
+
+	vector <char> lb(1, 'L');
+	vector <char> ub(1, 'U');
+	vector <double> ones(1, 1.0);
+	vector <double> zeros(1, 0.0);
+
+	start = std::chrono::high_resolution_clock::now(); //timestamp di inizio
+
+	int iterations = 1;
+
+	solution_t *firstSolution = startingSolution(env, lp, instance, contRelax); //kick-start: soluzione iniziale
+	if(firstSolution == NULL)
+	{
+		cerr << __FUNCTION__ << "(): Nessuna soluzione trovata per il rilassamento continuo dell'istanza " << instance << endl;
+		return NULL;
+	}
+	else //solution found
+	{
+		if(verbose == true)
+		{
+			cout << "Soluzione iniziale trovata:" << endl;
+			printRelaxedSolution(firstSolution);
+		}
+
+		solution_t *solution = NULL;
+
+		//recupero array y
+		int status = CPXgetx(env, lp, &firstSolutionArray[0], gety_index(), gety_index() + getTotalPotentialNodes() - getUsrsNum() - 1);
+		if(status != 0)
+		{
+			cerr << __FUNCTION__ << "(): Nessuna soluzione trovata per il rilassamento continuo dell'istanza " << instance << endl;
+			delete firstSolution;
+			return NULL;
+		}
+
+		while(stop != true)
+		{
+			//elaboro array y
+			if(verbose == true)
+			{
+				cout << "--------------------------------------------------------------------" <<endl;
+				cout << "Threshold: " << threshold << endl;
+			}
+			for(unsigned int l = 0; l < firstSolutionArray.size(); l++)
+			{			
+				
+				if(firstSolutionArray[l] >= threshold ) // vero -> c'e' un drone
+				{
+					solutionArray[l] = 1.0;
+				}
+				else
+				{
+					solutionArray[l] = 0.0;
+				}
+				
+				//cout << "y" << l + getUsrsNum() << " " << solutionArray[l] << endl;
+				yIndexes.push_back(gety_index() + l);
+			}
+			
+			//aggiorno il mip start con il nuovo vettore y
+			for(unsigned int i = 0; i< solutionArray.size(); i++)
+			{
+				
+				if(solutionArray[i] < 0.999)
+				{
+					CHECKED_CPX_CALL(CPXchgbds, env, lp, 1, &yIndexes[i], &lb[0], &zeros[0]);
+					CHECKED_CPX_CALL(CPXchgbds, env, lp, 1, &yIndexes[i], &ub[0], &zeros[0]);
+				}
+				else
+				{
+					CHECKED_CPX_CALL(CPXchgbds, env, lp, 1, &yIndexes[i], &lb[0], &ones[0]);
+					CHECKED_CPX_CALL(CPXchgbds, env, lp, 1, &yIndexes[i], &ub[0], &ones[0]);
+				}
+				//CPXwriteprob( env, lp, (instance + to_string(threshold) + ".lp").c_str(), NULL);
+			}	
+			
+			//ripeto ottimizzazione con mip start
+			//CPXmipopt(env, lp);  //LPOPT
+
+			//swaptocont già fatta da soluzione iniziale
+			startPartial = std::chrono::high_resolution_clock::now(); //timestamp di inizio
+				CPXlpopt(env,lp); //LPOPT
+			endPartial = std::chrono::high_resolution_clock::now(); //timestamp di fine
+
+			cout << "***LPOPT iterazione: " << iterations 
+			    << " terminato in "
+				<< std::chrono::duration_cast<std::chrono::milliseconds>(endPartial - startPartial).count() //casting per la conversione in millisecondi; (end-start).count() calcola la differenza di tempo e la restituisce come valore numerico
+				<< "ms" << " (" << std::chrono::duration_cast<std::chrono::seconds>(endPartial - startPartial).count() << "s c.ca).\n";
+
+			//CPXsolwrite(env, lp, (instance + "." + to_string(threshold) + ".sol").c_str());
+		
+			//check result
+			int optStat = CPXgetstat(env, lp);
+			//cout << "****codice: " << optStat << endl;
+			if(solutionExists(optStat) == true) //soluzione rilassata trovata
+			{
+
+				if(verbose == true)		
+					cout << "Soluzione rilassata trovata con soglia: " << threshold << endl;
+				
+				int intOptStat = 0;
+				
+				//esegui LP intero
+				//if(verbose == true)	
+					//CPXwriteprob( env, lp, (instance + ".cont.lp").c_str(), NULL);
+				
+				swapToInt(env, lp);
+				
+				//if(verbose == true)	
+					//CPXwriteprob( env, lp, (instance + ".int.lp").c_str(), NULL);
+				
+
+				startPartial = std::chrono::high_resolution_clock::now(); //timestamp di inizio
+					CPXmipopt(env,lp); //LPOPT
+				endPartial = std::chrono::high_resolution_clock::now(); //timestamp di fine
+
+				cout << "***MIPOPT iterazione: " << iterations 
+			    	<< " terminato in "
+					<< std::chrono::duration_cast<std::chrono::milliseconds>(endPartial - startPartial).count() //casting per la conversione in millisecondi; (end-start).count() calcola la differenza di tempo e la restituisce come valore numerico
+					<< "ms" << " (" << std::chrono::duration_cast<std::chrono::seconds>(endPartial - startPartial).count() << "s c.ca).\n";
+
+				
+				intOptStat = CPXgetstat(env, lp); 
+				if( solutionExists(intOptStat) == true) //soluzione intera: stop
+				{
+					stop = true;
+					end = std::chrono::high_resolution_clock::now(); //timestamp di fine
+					
+					if(verbose == true)	
+						cout << "Soluzione intera trovata con soglia: " << threshold << endl;
+
+					solution = getHeurSolution(env, lp, std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count(), instance, iterations);
+					if(solution == NULL)
+					{
+						cerr << __FUNCTION__ << "(): Impossibile recuperare la soluzione dell'istanza " << instance << endl;
+						
+						return NULL;
+					}
+
+					if(solution->yPositions.size() == 0)
+					{
+						cerr << __FUNCTION__ << "(): Impossibile recuperare la soluzione dell'istanza " << instance << endl;
+						delete solution;
+						return NULL;
+					}
+
+					//if(verbose == true)	
+					//	CPXsolwrite(env, lp, (instance + ".int." + to_string(threshold) + ".sol").c_str());
+				}
+				else //non c'e' soluzione intera, ricomincia da quella rilassata
+				{
+					if(verbose == true)	
+						cout << "No soluzione intera con soglia: " << threshold << endl;
+					
+					swapToCont(env,lp);
+
+					
+					threshold -= step;
+					solutionArray = firstSolutionArray; 
+					
+					if(threshold < stopValue)
+					{
+						stop = true;	
+					}
+				}
+			}
+			else //no solution, riduco la soglia, reset della soluzione
+			{
+				if(verbose == true)	
+					cout << "No soluzione rilassata con soglia: " << threshold << endl;
+				
+				threshold -= step;
+				
+				solutionArray = firstSolutionArray; 
+				if(threshold < stopValue ) //TODO: double comparison FUBAR, it misses one run
+				{
+					stop = true;
+				}
+			}
+
+			iterations++;
+		}
+		CPXsolwrite(env, lp, (instance + ".solve"  + ".sol").c_str());
+		//cleanup
+		delete firstSolution;
+		
+		if(solution == NULL)
+			cout << "Nessuna soluzione intera trovata per l'istanza: " << instance << endl;
+
+		return solution;
+	}
+}*/
+
+//ULTIMA
+solution_t *solve(CEnv env, Prob lp, string instance, bool verbose)
+{
+	int contRelax[] = {31};
+	std::chrono::high_resolution_clock::time_point start, end;
+	std::chrono::high_resolution_clock::time_point startPartial, endPartial;
 
 	bool stop = false;
 
@@ -439,6 +709,235 @@ solution_t *solve(CEnv env, Prob lp, string instance, bool verbose)
 	start = std::chrono::high_resolution_clock::now(); //timestamp di inizio
 
 	bool firstFound = false;
+
+	int iterations = 1;
+
+	solution_t *firstSolution = startingSolution(env, lp, instance, contRelax); //kick-start: soluzione iniziale
+	if(firstSolution == NULL)
+	{
+		cerr << __FUNCTION__ << "(): Nessuna soluzione trovata per il rilassamento continuo dell'istanza " << instance << endl;
+		return NULL;
+	}
+	else //solution found
+	{
+		if(verbose == true)
+		{
+			cout << "Soluzione iniziale trovata:" << endl;
+			printRelaxedSolution(firstSolution);
+		}
+
+		solution_t *solution = NULL;
+
+		//recupero array y
+		int status = CPXgetx(env, lp, &firstSolutionArray[0], gety_index(), gety_index() + getTotalPotentialNodes() - getUsrsNum() - 1);
+		if(status != 0)
+		{
+			cerr << __FUNCTION__ << "(): Nessuna soluzione trovata per il rilassamento continuo dell'istanza " << instance << endl;
+			delete firstSolution;
+			return NULL;
+		}
+
+		while(stop != true)
+		{
+			//elaboro array y
+			if(verbose == true)
+			{
+				cout << "--------------------------------------------------------------------" <<endl;
+				cout << "Threshold: " << threshold << endl;
+			}
+			for(unsigned int l = 0; l < firstSolutionArray.size(); l++)
+			{			
+				
+				if(firstSolutionArray[l] >= threshold ) // vero -> c'e' un drone
+				{
+					solutionArray[l] = 1.0;
+				}
+				else
+				{
+					solutionArray[l] = 0.0;
+				}
+				
+				//cout << "y" << l + getUsrsNum() << " " << solutionArray[l] << endl;
+				yIndexes.push_back(gety_index() + l);
+			}
+			
+			//aggiorno il mip start con il nuovo vettore y
+			for(unsigned int i = 0; i< solutionArray.size(); i++)
+			{
+				
+				if(solutionArray[i] < 0.99)
+				{
+					CHECKED_CPX_CALL(CPXchgbds, env, lp, 1, &yIndexes[i], &lb[0], &zeros[0]);
+					CHECKED_CPX_CALL(CPXchgbds, env, lp, 1, &yIndexes[i], &ub[0], &zeros[0]);
+				}
+				else
+				{
+					CHECKED_CPX_CALL(CPXchgbds, env, lp, 1, &yIndexes[i], &lb[0], &ones[0]);
+					CHECKED_CPX_CALL(CPXchgbds, env, lp, 1, &yIndexes[i], &ub[0], &ones[0]);
+				}
+				//CPXwriteprob( env, lp, (instance + to_string(threshold) + ".lp").c_str(), NULL);
+			}	
+			
+			//ripeto ottimizzazione con mip start
+			//CPXmipopt(env, lp);  //LPOPT
+
+			//swaptocont già fatta da soluzione iniziale
+			startPartial = std::chrono::high_resolution_clock::now(); //timestamp di inizio
+				CPXlpopt(env,lp); //LPOPT
+			endPartial = std::chrono::high_resolution_clock::now(); //timestamp di fine
+
+			cout << "***LPOPT iterazione: " << iterations 
+			    << " terminato in "
+				<< std::chrono::duration_cast<std::chrono::milliseconds>(endPartial - startPartial).count() //casting per la conversione in millisecondi; (end-start).count() calcola la differenza di tempo e la restituisce come valore numerico
+				<< "ms" << " (" << std::chrono::duration_cast<std::chrono::seconds>(endPartial - startPartial).count() << "s c.ca).\n";
+
+			//CPXsolwrite(env, lp, (instance + "." + to_string(threshold) + ".sol").c_str());
+		
+			//check result
+			int optStat = CPXgetstat(env, lp);
+			//cout << "****codice: " << optStat << endl;
+			if(solutionExists(optStat) == true) //soluzione rilassata trovata
+			{
+
+				if(verbose == true)		
+					cout << "Soluzione rilassata trovata con soglia: " << threshold << endl;
+				
+				int intOptStat = 0;
+				
+				//esegui LP intero
+				if(verbose == true)	
+					CPXwriteprob( env, lp, (instance + ".cont.lp").c_str(), NULL);
+				
+				swapToInt(env, lp);
+				
+				if(verbose == true)	
+					CPXwriteprob( env, lp, (instance + ".int.lp").c_str(), NULL);
+				
+
+				startPartial = std::chrono::high_resolution_clock::now(); //timestamp di inizio
+					CPXmipopt(env,lp); //LPOPT
+				endPartial = std::chrono::high_resolution_clock::now(); //timestamp di fine
+
+				cout << "***MIPOPT iterazione: " << iterations 
+			    	<< " terminato in "
+					<< std::chrono::duration_cast<std::chrono::milliseconds>(endPartial - startPartial).count() //casting per la conversione in millisecondi; (end-start).count() calcola la differenza di tempo e la restituisce come valore numerico
+					<< "ms" << " (" << std::chrono::duration_cast<std::chrono::seconds>(endPartial - startPartial).count() << "s c.ca).\n";
+
+				
+				intOptStat = CPXgetstat(env, lp); 
+				if( solutionExists(intOptStat) == true) //soluzione intera: stop
+				{
+					stop = true;
+					end = std::chrono::high_resolution_clock::now(); //timestamp di fine
+					
+					if(verbose == true)	
+						cout << "Soluzione intera trovata con soglia: " << threshold << endl;
+
+					solution = getHeurSolution(env, lp, std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count(), instance, iterations);
+					if(solution == NULL)
+					{
+						cerr << __FUNCTION__ << "(): Impossibile recuperare la soluzione dell'istanza " << instance << endl;
+						
+						return NULL;
+					}
+
+					if(solution->yPositions.size() == 0)
+					{
+						cerr << __FUNCTION__ << "(): Impossibile recuperare la soluzione dell'istanza " << instance << endl;
+						delete solution;
+						return NULL;
+					}
+
+					if(verbose == true)	
+						CPXsolwrite(env, lp, (instance + ".int." + to_string(threshold) + ".sol").c_str());
+				}
+				else //non c'e' soluzione intera, ricomincia da quella rilassata
+				{
+					if(verbose == true)	
+						cout << "No soluzione intera con soglia: " << threshold << endl;
+					
+					swapToCont(env,lp);
+
+					if(firstFound == false) //ricerca più approfondita
+					{
+						
+						firstFound = true;
+						threshold+= step;
+						
+						step = accstep;
+						
+						threshold -= step;
+						
+					}
+					else
+					{
+						threshold -= step;
+						solutionArray = firstSolutionArray; 
+					}
+					
+					if(threshold < stopValue)
+					{
+						stop = true;	
+					}
+				}
+			}
+			else //no solution, riduco la soglia, reset della soluzione
+			{
+				if(verbose == true)	
+					cout << "No soluzione rilassata con soglia: " << threshold << endl;
+				
+				threshold -= step;
+				
+				solutionArray = firstSolutionArray; 
+				if(threshold < stopValue ) //TODO: double comparison FUBAR, it misses one run
+				{
+					stop = true;
+				}
+			}
+
+			iterations++;
+		}
+		CPXsolwrite(env, lp, (instance + ".solve"  + ".sol").c_str());
+		//cleanup
+		delete firstSolution;
+		
+		if(solution == NULL)
+			cout << "Nessuna soluzione intera trovata per l'istanza: " << instance << endl;
+
+		return solution;
+	}
+}
+
+//last working
+/*solution_t *solve(CEnv env, Prob lp, string instance, bool verbose)
+{
+	int contRelax[] = {31};
+	std::chrono::high_resolution_clock::time_point start, end;
+	std::chrono::high_resolution_clock::time_point startPartial, endPartial;
+
+	bool stop = false;
+
+	double threshold = 1.0;
+	double step = 0.01;
+	double accstep = 0.005;
+	double stopValue = step;
+
+
+
+	vector< int > yIndexes;
+	vector< double > solutionArray(getTotalPotentialNodes() - getUsrsNum());
+	vector< double > firstSolutionArray(getTotalPotentialNodes() - getUsrsNum());
+
+	vector <char> lb(1, 'L');
+	vector <char> ub(1, 'U');
+	vector <double> ones(1, 1.0);
+	vector <double> zeros(1, 0.0);
+
+	start = std::chrono::high_resolution_clock::now(); //timestamp di inizio
+
+	bool firstFound = false;
+
+	int iterations = 1;
 
 	solution_t *firstSolution = startingSolution(env, lp, instance, contRelax); //kick-start: soluzione iniziale
 	if(firstSolution == NULL)
@@ -507,13 +1006,24 @@ solution_t *solve(CEnv env, Prob lp, string instance, bool verbose)
 			}	
 			
 			//ripeto ottimizzazione con mip start
-			CPXmipopt(env, lp); 
+			//CPXmipopt(env, lp);  //LPOPT
+
+			//swaptocont già fatta da soluzione iniziale
+			startPartial = std::chrono::high_resolution_clock::now(); //timestamp di inizio
+				CPXlpopt(env,lp); //LPOPT
+			endPartial = std::chrono::high_resolution_clock::now(); //timestamp di fine
+
+			cout << "LPOPT iterazione: " << iterations 
+			    << " terminato in "
+				<< std::chrono::duration_cast<std::chrono::milliseconds>(endPartial - startPartial).count() //casting per la conversione in millisecondi; (end-start).count() calcola la differenza di tempo e la restituisce come valore numerico
+				<< "ms" << " (" << std::chrono::duration_cast<std::chrono::seconds>(endPartial - startPartial).count() << "s c.ca).\n";
+
 			//CPXsolwrite(env, lp, (instance + "." + to_string(threshold) + ".sol").c_str());
 		
 			//check result
 			int optStat = CPXgetstat(env, lp);
 			
-			if(optStat == 101 || optStat == 102) //soluzione rilassata trovata
+			if(solutionExists(optStat) == true) //soluzione rilassata trovata
 			{
 
 				if(verbose == true)		
@@ -522,39 +1032,35 @@ solution_t *solve(CEnv env, Prob lp, string instance, bool verbose)
 				int intOptStat = 0;
 				
 				//esegui LP intero
-				if(verbose == true)	
-					CPXwriteprob( env, lp, (instance + ".cont.lp").c_str(), NULL);
+				//if(verbose == true)	
+					//CPXwriteprob( env, lp, (instance + ".cont.lp").c_str(), NULL);
 				
 				swapToInt(env, lp);
 				
-				if(verbose == true)	
-					CPXwriteprob( env, lp, (instance + ".int.lp").c_str(), NULL);
+				//if(verbose == true)	
+					//CPXwriteprob( env, lp, (instance + ".int.lp").c_str(), NULL);
 				
-				CPXmipopt(env, lp); 
+
+				startPartial = std::chrono::high_resolution_clock::now(); //timestamp di inizio
+					CPXmipopt(env,lp); //LPOPT
+				endPartial = std::chrono::high_resolution_clock::now(); //timestamp di fine
+
+				cout << "MIPOPT iterazione: " << iterations 
+			    	<< " terminato in "
+					<< std::chrono::duration_cast<std::chrono::milliseconds>(endPartial - startPartial).count() //casting per la conversione in millisecondi; (end-start).count() calcola la differenza di tempo e la restituisce come valore numerico
+					<< "ms" << " (" << std::chrono::duration_cast<std::chrono::seconds>(endPartial - startPartial).count() << "s c.ca).\n";
+
 				
 				intOptStat = CPXgetstat(env, lp); 
-				if(intOptStat == 101 || intOptStat == 102) //soluzione intera: stop
+				if( solutionExists(intOptStat) == true) //soluzione intera: stop
 				{
 					stop = true;
 					end = std::chrono::high_resolution_clock::now(); //timestamp di fine
 					
 					if(verbose == true)	
 						cout << "Soluzione intera trovata con soglia: " << threshold << endl;
-					
-					//aggiorna la soluzione
-					/*try
-					{
-						solution = new solution_t;
-					}
-					catch (exception& e)
-					{
-						cerr << __FUNCTION__ << "(): An exception has occurred: " << e.what() << endl;
-						delete firstSolution;
-						
-						return NULL;
-					}*/
 
-					solution = getSolution(env, lp, std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count(), instance);
+					solution = getHeurSolution(env, lp, std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count(), instance, iterations);
 					if(solution == NULL)
 					{
 						cerr << __FUNCTION__ << "(): Impossibile recuperare la soluzione dell'istanza " << instance << endl;
@@ -569,8 +1075,8 @@ solution_t *solve(CEnv env, Prob lp, string instance, bool verbose)
 						return NULL;
 					}
 
-					if(verbose == true)	
-						CPXsolwrite(env, lp, (instance + ".int." + to_string(threshold) + ".sol").c_str());
+					//if(verbose == true)	
+					//	CPXsolwrite(env, lp, (instance + ".int." + to_string(threshold) + ".sol").c_str());
 				}
 				else //non c'e' soluzione intera, ricomincia da quella rilassata
 				{
@@ -615,8 +1121,10 @@ solution_t *solve(CEnv env, Prob lp, string instance, bool verbose)
 					stop = true;
 				}
 			}
+
+			iterations++;
 		}
-		CPXsolwrite(env, lp, (instance + ".fin"  + ".sol").c_str());
+		CPXsolwrite(env, lp, (instance + ".solve"  + ".sol").c_str());
 		//cleanup
 		delete firstSolution;
 		
@@ -625,7 +1133,7 @@ solution_t *solve(CEnv env, Prob lp, string instance, bool verbose)
 
 		return solution;
 	}
-}
+}*/
 
 
 

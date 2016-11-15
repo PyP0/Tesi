@@ -40,6 +40,7 @@ criteria for tabu-ed moves.
 
 */
 
+bool solutionExists(int);
 double evaluate(solution_t*);
 void findBestNeighbor(move); 
 solution_t *executeHeurInstance(std::string, bool, int[]);

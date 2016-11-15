@@ -64,20 +64,24 @@ solution_t *executeInstance(string fileName, bool verbose, int contRelax[])
 	DECL_ENV(env);
 	DECL_PROB(env, lp);
 
-	/*if(CPXsetintparam(env, CPX_PARAM_DATACHECK, 1) != 0) 
-		cerr << __FUNCTION__ << "(): 1 Impossibile settare uno o piu' parametri di CPLEX." << endl;
+	/*if(CPXsetintparam(env, CPX_PARAM_CLOCKTYPE, 2) != 0) 
+		cerr << __FUNCTION__ << "(): 2 Impossibile settare uno o piu' parametri di CPLEX." << endl;
 	
 	if(CPXsetintparam(env, CPX_PARAM_CONFLICTDISPLAY, 2) != 0) 
-		cerr << __FUNCTION__ << "(): 2 Impossibile settare uno o piu' parametri di CPLEX." << endl;
-
-	if(CPXsetintparam(env, CPX_PARAM_MEMORYEMPHASIS, 1) != 0) 
 		cerr << __FUNCTION__ << "(): 3 Impossibile settare uno o piu' parametri di CPLEX." << endl;
 
-	if(CPXsetintparam(env, CPX_PARAM_NODEFILEIND, 3) != 0) 
+	if(CPXsetintparam(env, CPX_PARAM_MEMORYEMPHASIS, 1) != 0) 
 		cerr << __FUNCTION__ << "(): 4 Impossibile settare uno o piu' parametri di CPLEX." << endl;
 
+	if(CPXsetintparam(env, CPX_PARAM_NODEFILEIND, 3) != 0) 
+		cerr << __FUNCTION__ << "(): 5 Impossibile settare uno o piu' parametri di CPLEX." << endl;
+
 	if(CPXsetdblparam(env, CPX_PARAM_TRELIM, 16384.0 ) != 0) //16GB
-		cerr << __FUNCTION__ << "(): 4 Impossibile settare uno o piu' parametri di CPLEX." << endl;*/
+		cerr << __FUNCTION__ << "(): 6 Impossibile settare uno o piu' parametri di CPLEX." << endl;
+
+
+	if(CPXsetdblparam(env, CPX_PARAM_TILIM, 1800.0 ) != 0) 
+		cerr << __FUNCTION__ << "(): 7 Impossibile settare uno o piu' parametri di CPLEX." << endl;*/
 
 
 	//CPXwriteparam (env, "CPLEXparams.prm");
@@ -199,9 +203,10 @@ int executeMaster(vector< string > fileList, string masterSolutionsFile, bool ve
 					}
 					//remove the ../instances/ //TODO: fixare
 					file << instSolution->instName.substr(13,string::npos) << "\t";
-					file << instSolution->objValue << "\t";
+					//file << instSolution->objValue << "\t";
 					file << instSolution->execTime << "\t";
 					file << dronesCount << "/" << getDrnsNum() << "\t";
+					file << instSolution->openedNodes << "\t";
 					file << instSolution->statusCode << endl;
 
 					delete instSolution;
@@ -236,6 +241,41 @@ int main(int argc, char const *argv[])
 	int contRelax[] = {0};
 	int typeOfLPVariables = 5;
 	//string baseFileName;
+	
+	// ./main -D ../instances users gridL gridH step
+	//     0   1       2        3     4     5     6
+	if(string(argv[1]).compare(string("-D")) == 0)
+	{
+		vector<int> users;
+		vector<int> gridL;
+		vector<int> gridH;
+		vector<int> step;
+		
+		users.push_back(atoi(argv[3]));
+		gridL.push_back(atoi(argv[4]));
+		gridH.push_back(atoi(argv[5]));
+		step.push_back(atoi(argv[6]));
+		string basePath("../");
+		string folderName( basePath +to_string(users[0]) + "_" + to_string( gridL[0] * gridH[0]) + "/"  );
+		
+		//DATASET
+			createBatchInstances(
+			3, //instQuantity
+			users, //users
+			vector<int> {30}, //drones
+			gridL, //gridLength
+			gridH,  //gridHeight
+			step,  //gridStep
+			0, 	//tInf
+			150, //tSup
+			5,	//cInf
+			10, //cSup
+			200, //dInf
+			200, //dSup
+			string("dataset"),
+			folderName);
+		return 0;
+	}	
 	if(argc == 1)
 	{
 		//int instQuantity, vector<int> users, vector<int> drones, vector<int> gridLength, vector<int> gridHeight, vector<int> gridStep, int tInf, int tSup, double cInf, double cSup, double dInf, double dSup, string instRootName)
@@ -259,16 +299,32 @@ int main(int argc, char const *argv[])
 			5, //instQuantity
 			vector<int> {10,20,25,30,40,50}, //users
 			vector<int> {20}, //drones
-			vector<int> {9,10,15,20,25,50}, //gridLength
-			vector<int> {9,10,10,10,20,20},  //gridHeight
-			vector<int> {50,50,50,50,50,50},  //gridStep
+			vector<int> {10,15,20,30,25,50}, //gridLength
+			vector<int> {10,10,10,10,20,20},  //gridHeight
+			vector<int> {5,5,5,5,5,5},  //gridStep
+			0, 	//tInf
+			150, //tSup
+			5,	//cInf
+			10, //cSup
+			200, //dInf
+			200, //dSup
+			string("dataset"),
+			string(INSTANCE_PATH));
+			
+			/*createBatchInstances(
+			10, //instQuantity
+			vector<int> {5}, //users
+			vector<int> {20}, //drones
+			vector<int> {9}, //gridLength
+			vector<int> {9},  //gridHeight
+			vector<int> {2},  //gridStep
 			50, 	//tInf
 			1000, //tSup
 			5,	//cInf
 			10, //cSup
 			200, //dInf
 			200, //dSup
-			string("dataset"));
+			string("dataset"));*/
 	}
 	else
 	{
@@ -533,7 +589,7 @@ int main(int argc, char const *argv[])
 				if(csvFile.is_open())
 				{
 					//vector < solution_t* > solutions(2);
-					int count[1];
+					//int count[1];
 					vector < int > yValue;
 
 					for(unsigned int i = 0; i < listOfInstance.size(); i++)
@@ -552,6 +608,7 @@ int main(int argc, char const *argv[])
 							
 							cout << "Instance " << listOfInstance[i] << " loaded." << endl;
 							
+
 							solution_t * heurSol = solve(env,lp1, listOfInstance[i].c_str(), false);
 							//printSolution(heurSol);
 							// free
@@ -563,11 +620,11 @@ int main(int argc, char const *argv[])
 								cerr << __FUNCTION__ << "(): Soluzione non trovata per l'istanza " << listOfInstance[i] << endl;
 								csvFile << listOfInstance[i] << '\t';
 								csvFile << "-1" << '\t';
+								//csvFile << "-1" << '\t';
 								csvFile << "-1" << '\t';
 								csvFile << "-1" << '\t';
 								csvFile << "-1" << '\t';
-								csvFile << "-1" << '\t';
-								csvFile << '\t';
+								csvFile << "-1" <<'\t';
 							}
 							else
 							{
@@ -578,9 +635,10 @@ int main(int argc, char const *argv[])
 								cout << heurSol->execTime << endl;
 								cout << heurSol->statusCode << endl << endl;*/
 								csvFile << listOfInstance[i] << '\t';
-								csvFile << heurSol->objValue << '\t';
+								//csvFile << heurSol->objValue << '\t';
 								csvFile << heurSol->execTime << '\t';
 								csvFile << heurSol->statusCode << '\t';
+								csvFile << heurSol->heurIterationCount << '\t';
 								int dronesCount = 0;
 									
 								for(unsigned int l = 0; l < heurSol->yPositions.size(); l++)
@@ -616,7 +674,9 @@ int main(int argc, char const *argv[])
 
 
 						//solve 2
-						cout << "Esecuzione euristica 2." << endl;
+						cout << endl << "---------------------------------------------------------------------" << endl
+							<< "Esecuzione euristica 2." << endl;
+
 						DECL_PROB(env, lp2);
 						if (loadInstance(listOfInstance[i].c_str()) != 0)
 						{
@@ -629,7 +689,7 @@ int main(int argc, char const *argv[])
 							
 							cout << "Instance " << listOfInstance[i] << " loaded." << endl;
 							
-							solution_t * heurSol = solve2(env,lp2, listOfInstance[i].c_str(),false);
+							solution_t * heurSol = solve2(env,lp2, listOfInstance[i].c_str(),true);
 							
 							// free
 							CPXfreeprob(env, &lp2);
@@ -639,7 +699,7 @@ int main(int argc, char const *argv[])
 							{
 								cerr << __FUNCTION__ << "(): Soluzione non trovata per l'istanza " << listOfInstance[i] << endl;
 								
-								csvFile << "-1" << '\t';
+								//csvFile << "-1" << '\t';
 								csvFile << "-1" << '\t';
 								csvFile << "-1" << '\t';
 								csvFile << "-1" << '\t';
@@ -650,9 +710,10 @@ int main(int argc, char const *argv[])
 							{
 								//printSolution(heurSol);
 								
-								csvFile << heurSol->objValue << '\t';
+								//csvFile << heurSol->objValue << '\t';
 								csvFile << heurSol->execTime << '\t';
 								csvFile << heurSol->statusCode << '\t';
+								csvFile << heurSol->heurIterationCount << '\t';
 								int dronesCount = 0;
 									
 								for(unsigned int l = 0; l < heurSol->yPositions.size(); l++)
@@ -753,7 +814,7 @@ int main(int argc, char const *argv[])
 					printTrafficMatrix();
 				}
 
-				solution_t * heurSol = solve(env,lp, argv[2],true);
+				solution_t * heurSol = solve2(env,lp, argv[2],true);
 				
 				// free
 				CPXfreeprob(env, &lp);

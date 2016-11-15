@@ -6,8 +6,9 @@
 #include <unordered_map>
 #include <map>
 
-#define DISCONNECTED_COST CPX_INFBOUND
-#define INSTANCE_PATH "../instances/"
+// #define DISCONNECTED_COST CPX_INFBOUND NOCOST
+//#define INSTANCE_PATH "../instances/" DATASET
+#define INSTANCE_PATH "../dataset/"
 #define MASTER_FILE "master.txt"
 
 //test coordinate discrete su griglia
@@ -53,13 +54,14 @@ int getTotalNodes();
 double getDeployCost(int);
 int getRequestedTraffic(int,int);
 
+
 double getWCInterferencePercentage();
 double getReductionFactor();
 double getInterferenceCoef(int, int);
 double getInterference(int, int); //related to the matrix
-double getCost(int,int,int);
+//double getCost(int,int,int); NOCOST
 
-bool isCEmpty();
+//bool isCEmpty(); NOCOST
 
 double getInterferenceFactor(int, int);   
 
@@ -71,6 +73,6 @@ void printTrafficMatrix();
 void printBuckets(std::unordered_map<int,int>);
 int saveInstance(const char *);
 int loadInstance(const char *);
-int createBatchInstances(int,std::vector<int>,std::vector<int>,std::vector<int>,std::vector<int>,std::vector<int>,int,int,double,double,double,double,std::string);
+int createBatchInstances(int,std::vector<int>,std::vector<int>,std::vector<int>,std::vector<int>,std::vector<int>,int,int,double,double,double,double,std::string, std::string);
 
 #endif
