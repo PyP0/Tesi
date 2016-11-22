@@ -35,13 +35,12 @@ vector< string > loadFileList(string masterFile)
 	file.open(masterFile,ios::in);
 	if(file.is_open())
 	{
-		while(!file.eof())
+		while(file >> fileLine)
 		{
-			file >> fileLine;
 			cout <<fileLine <<endl;
 			fileList.push_back(fileLine);
-			if(!file.eof())
 				count++;
+			
 		}
 		cout << "Sono state caricate " << count << " istanze." << endl;
 		file.close();
@@ -112,7 +111,7 @@ solution_t *executeInstance(string fileName, bool verbose, int contRelax[])
 			
 			cout << "Users: " << getUsrsNum() << endl;
 			cout << "Drones: " << getDrnsNum() << endl;
-			cout << "Potential drones positions: " << getPosNum() << endl << endl;
+			cout << "Potential drones positions: " << getTotalPotentialNodes() << endl << endl;
 			//printNodesIOFlow();
 			printTrafficMatrix();
 		}
@@ -256,7 +255,7 @@ int main(int argc, char const *argv[])
 		gridH.push_back(atoi(argv[5]));
 		step.push_back(atoi(argv[6]));
 		string basePath("../");
-		string folderName( basePath +to_string(users[0]) + "_" + to_string( gridL[0] * gridH[0]) + "/"  );
+		string folderName( basePath +  to_string(users[0]) + "_" + to_string( gridL[0] * gridH[0]) + "/"  );
 		
 		//DATASET
 			createBatchInstances(
@@ -674,7 +673,7 @@ int main(int argc, char const *argv[])
 
 
 						//solve 2
-						cout << endl << "---------------------------------------------------------------------" << endl
+						/*cout << endl << "---------------------------------------------------------------------" << endl
 							<< "Esecuzione euristica 2." << endl;
 
 						DECL_PROB(env, lp2);
@@ -743,7 +742,7 @@ int main(int argc, char const *argv[])
 								yValue.clear();
 							}
 							csvFile << endl;
-						}
+						}*/
 					}	
 						
 					cout << "Max physical memory usage: " << getPeakRSS( ) << " KB" << endl;
@@ -809,7 +808,7 @@ int main(int argc, char const *argv[])
 					
 					cout << "Users: " << getUsrsNum() << endl;
 					cout << "Drones: " << getDrnsNum() << endl;
-					cout << "Potential drones positions: " << getPosNum() << endl << endl;
+					cout << "Potential drones positions: " << getTotalPotentialNodes() << endl << endl;
 					//printNodesIOFlow();
 					printTrafficMatrix();
 				}
@@ -880,7 +879,7 @@ int main(int argc, char const *argv[])
 				string pathToMasterSolFile(argv[2]);
 				pathToMasterSolFile = pathToMasterSolFile + MASTER_SOLUTIONS_FILE;
 				
-				int status = executeMaster(loadFileList(pathToMaster.c_str()), pathToMasterSolFile.c_str(), verbose, contRelax);
+				int status = executeMaster(loadFileList(pathToMaster.c_str()), pathToMasterSolFile.c_str(), true, contRelax);
 
 				cout << "Max physical memory usage: " << getPeakRSS( ) << " KB" << endl;
 

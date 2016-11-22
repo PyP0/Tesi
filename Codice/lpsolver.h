@@ -29,6 +29,9 @@ solution_t *getSolution(CEnv,Prob,unsigned long int,std::string);
 
 solution_t *getHeurSolution(CEnv,Prob,unsigned long int,std::string,int);
 
+solution_t *copySolution(solution_t*);
+
+int dronesCount(solution_t*, double);
 void printVarsValue(CEnv, Prob);
 //solution_t *getSolution(CEnv, Prob);
 void printSolution(solution_t*);

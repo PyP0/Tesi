@@ -171,7 +171,7 @@ solution_t *executeHeurInstance(string fileName, bool verbose, int contRelax[])
 			
 			cout << "Users: " << getUsrsNum() << endl;
 			cout << "Drones: " << getDrnsNum() << endl;
-			cout << "Potential drones positions: " << getPosNum() << endl << endl;
+			cout << "Potential drones positions: " << getTotalPotentialNodes() << endl << endl;
 			//printNodesIOFlow();
 			printTrafficMatrix();
 		}
@@ -691,10 +691,9 @@ solution_t *solve(CEnv env, Prob lp, string instance, bool verbose)
 	bool stop = false;
 
 	double threshold = 1.0;
-	double step = 0.01;
-	double accstep = 0.005;
-	double stopValue = step;
+	double left, right;
 
+	double stopValue = 0.0001;
 
 
 	vector< int > yIndexes;
@@ -708,11 +707,11 @@ solution_t *solve(CEnv env, Prob lp, string instance, bool verbose)
 
 	start = std::chrono::high_resolution_clock::now(); //timestamp di inizio
 
-	bool firstFound = false;
-
 	int iterations = 1;
 
 	solution_t *firstSolution = startingSolution(env, lp, instance, contRelax); //kick-start: soluzione iniziale
+	solution_t *bestSolution = NULL;
+
 	if(firstSolution == NULL)
 	{
 		cerr << __FUNCTION__ << "(): Nessuna soluzione trovata per il rilassamento continuo dell'istanza " << instance << endl;
@@ -720,6 +719,14 @@ solution_t *solve(CEnv env, Prob lp, string instance, bool verbose)
 	}
 	else //solution found
 	{
+		left = 1.0;
+		right = 0.0;
+		threshold = (left + right) / 2.0;
+
+		cout<< "Left: " << left << endl;
+		cout << "Right: " << right << endl;
+		cout << "Threshold: " << threshold << endl;
+
 		if(verbose == true)
 		{
 			cout << "Soluzione iniziale trovata:" << endl;
@@ -736,10 +743,24 @@ solution_t *solve(CEnv env, Prob lp, string instance, bool verbose)
 			delete firstSolution;
 			return NULL;
 		}
+ 
+ 		try
+ 		{
+			bestSolution = new solution_t;
 
-		while(stop != true)
+			bestSolution->yPositions.assign(getTotalPotentialNodes()-getUsrsNum(), 1.0); //init to worst value possibile
+			
+		}
+		catch (exception& e)
+		{
+			cerr << __FUNCTION__ << "(): An exception has occurred: " << e.what() << endl;
+			return NULL;
+		}
+
+		while(threshold >= stopValue && stop == false)
 		{
 			//elaboro array y
+			cout << "threshold: " << threshold << endl;
 			if(verbose == true)
 			{
 				cout << "--------------------------------------------------------------------" <<endl;
@@ -795,9 +816,10 @@ solution_t *solve(CEnv env, Prob lp, string instance, bool verbose)
 		
 			//check result
 			int optStat = CPXgetstat(env, lp);
-			//cout << "****codice: " << optStat << endl;
+			cout << "****codice: " << optStat << endl;
 			if(solutionExists(optStat) == true) //soluzione rilassata trovata
 			{
+
 
 				if(verbose == true)		
 					cout << "Soluzione rilassata trovata con soglia: " << threshold << endl;
@@ -825,15 +847,19 @@ solution_t *solve(CEnv env, Prob lp, string instance, bool verbose)
 
 				
 				intOptStat = CPXgetstat(env, lp); 
-				if( solutionExists(intOptStat) == true) //soluzione intera: stop
+				if( solutionExists(intOptStat) == true) //soluzione intera
 				{
-					stop = true;
-					end = std::chrono::high_resolution_clock::now(); //timestamp di fine
 					
+					cout << "pippo" << endl;
 					if(verbose == true)	
 						cout << "Soluzione intera trovata con soglia: " << threshold << endl;
 
+					end = std::chrono::high_resolution_clock::now(); //timestamp di fine
+
 					solution = getHeurSolution(env, lp, std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count(), instance, iterations);
+					printSolution(solution);
+
+					cout << "pappo" << endl;
 					if(solution == NULL)
 					{
 						cerr << __FUNCTION__ << "(): Impossibile recuperare la soluzione dell'istanza " << instance << endl;
@@ -848,51 +874,71 @@ solution_t *solve(CEnv env, Prob lp, string instance, bool verbose)
 						return NULL;
 					}
 
+					cout << "peppo" << endl;
+					if(dronesCount(solution,1.0) < dronesCount(bestSolution,1.0)) //trovata soluzione migliore
+					{	
+						cout << "pioppo" << endl;
+
+						cout << "Ultima soluzione # droni: " << dronesCount(bestSolution,1.0) << endl;
+						cout << "Trovata nuova soluzione con # droni: " << dronesCount(solution,1.0) << endl;
+						delete bestSolution;
+
+						bestSolution = copySolution(solution);
+
+						if(bestSolution == NULL)
+						{
+							cerr << __FUNCTION__ << "(): Impossibile copiare la soluzione." << endl;
+							stop = true; 
+						}
+						else
+						{
+							//sposta la ricerca a sinistra
+							right = threshold;
+
+							threshold = (left + right) / 2.0;
+							cout<< "Left: " << left << endl;
+							cout << "Right: " << right << endl;
+							cout << "Threshold: " << threshold << endl;
+						}
+					}
+					else // soluzione attuale e' la migliore
+					{
+						stop = true;
+						//end = std::chrono::high_resolution_clock::now(); //timestamp di fine
+					}
+
 					if(verbose == true)	
 						CPXsolwrite(env, lp, (instance + ".int." + to_string(threshold) + ".sol").c_str());
 				}
-				else //non c'e' soluzione intera, ricomincia da quella rilassata
+				else //no soluzione intera, salto a destra
 				{
 					if(verbose == true)	
 						cout << "No soluzione intera con soglia: " << threshold << endl;
 					
 					swapToCont(env,lp);
 
-					if(firstFound == false) //ricerca più approfondita
-					{
-						
-						firstFound = true;
-						threshold+= step;
-						
-						step = accstep;
-						
-						threshold -= step;
-						
-					}
-					else
-					{
-						threshold -= step;
-						solutionArray = firstSolutionArray; 
-					}
-					
-					if(threshold < stopValue)
-					{
-						stop = true;	
-					}
+					left = threshold;
+					threshold = (left + right) / 2.0;
+
+					cout<< "Left: " << left << endl;
+					cout << "Right: " << right << endl;
+					cout << "Threshold: " << threshold << endl;
 				}
 			}
-			else //no solution, riduco la soglia, reset della soluzione
+			else //no soluzione rilassata, salto a destra 
 			{
 				if(verbose == true)	
 					cout << "No soluzione rilassata con soglia: " << threshold << endl;
 				
-				threshold -= step;
-				
-				solutionArray = firstSolutionArray; 
-				if(threshold < stopValue ) //TODO: double comparison FUBAR, it misses one run
-				{
-					stop = true;
-				}
+				//threshold -= step;
+				left = threshold;
+				threshold = (left + right) / 2.0;
+
+				cout<< "Left: " << left << endl;
+				cout << "Right: " << right << endl;
+				cout << "Threshold: " << threshold << endl;
+
+				//solutionArray = firstSolutionArray; 
 			}
 
 			iterations++;
@@ -904,7 +950,7 @@ solution_t *solve(CEnv env, Prob lp, string instance, bool verbose)
 		if(solution == NULL)
 			cout << "Nessuna soluzione intera trovata per l'istanza: " << instance << endl;
 
-		return solution;
+		return bestSolution;
 	}
 }
 

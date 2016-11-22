@@ -96,7 +96,7 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 
 	//vector< vector<int> > wMap(getTotalPotentialNodes(), vector<int>(getTotalPotentialNodes(), -1));
 
-	vector< vector<int> > zMap(getPosNum(), vector<int>(getPosNum(), -1));
+	vector< vector<int> > zMap(getTotalPotentialNodes(), vector<int>(getTotalPotentialNodes(), -1));
 
 	
 
@@ -153,7 +153,8 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 
 	y_index = CPXgetnumcols(env, lp);
 
-	for (int i = 0; i < getPosNum() - getUsrsNum(); i++)
+	//for (int i = 0; i < getTotalPotentialNodes() - getUsrsNum(); i++) NEWGRID
+	for (int i = 0; i < getTotalPotentialNodes() - getUsrsNum(); i++)
 	{
 		char ytype; 
 		if( (contRelax[0] & 8) != 8) //rilassamento continuo?
@@ -771,7 +772,7 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 	//cout << "Vincoli (3) creati\n";
 
 	// 4. non posizionare piu' di d droni (11)
-	double temp_d = (double)getDrnsNum();
+	/*double temp_d = (double)getDrnsNum();
 	sense = 'L';
 	matbeg = 0;
 	coef.clear();
@@ -788,7 +789,7 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 
 	CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idx.size(), &temp_d, &sense, &matbeg, &idx[0], &coef[0], NULL, &rowname);
 	idx.clear();
-	coef.clear();
+	coef.clear();*/
 
 	//cout << "Vincoli (4) creati\n";
 
@@ -1610,12 +1611,17 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 	//vector<int> noFlightZones {0,1,3,4,5,7,8,9,13,17,27,31,35,36,37,39,40,41,43,44};
 
 	//btn41
-	//vector<int> noFlightZones {0,1,4,5,6,7,8,9,10,11,12,13,14,15,20,21,22,23,24,25,26,28,29,36,37,40,44,60,65,66,67,68,69,70,74,75,76,79,80,81,82,83,84,85,86,88,88};
+	//vector<int> noFlightZones {0,1,4,5,6,7,8,9,10,11,12,13,14,15,20,21,22,23,24,25,26,28,29,36,37,40,44,60,65,66,67,68,69,70,74,75,76,79,80,81,82,83,84,85,86,88,89};
 	
 	//btn48
-	//vector<int> noFlightZones {19,20,24,26,27,28,29,31,32,34,35,36,37,39,43,44};
+	//vector<int> noFlightZones {3,4,24,26,27,28,29,31,32,34,35,36,37,39,59,60};
 
-	/*vector <char> lb(1, 'L');
+	/*for(int i=0; i< (int) noFlightZones.size(); i++)
+	{
+		noFlightZones[i]+= getUsrsNum();
+	}
+
+	vector <char> lb(1, 'L');
 	vector <char> ub(1, 'U');
 	vector <double> zeros(1, 0.0);
 	 
@@ -1691,14 +1697,14 @@ void printSolution(solution_t *solution)
 		cout << "Valore f. obiettivo: " << solution->objValue << endl;
 		cout << "Tempo totale impiegato (ms): " << solution->execTime << endl;
 		cout << "Nodi esplorati: " << solution->openedNodes << endl;
-		for (int i = 0; i < getPosNum() - getUsrsNum(); i++)
+		for (int i = 0; i < getTotalPotentialNodes() - getUsrsNum(); i++)
 		{
 			if (round(solution->yPositions[i]) == 1)
 				count++;
 		}
 		cout << "Droni impiegati/droni totali: " << count << "/" << getDrnsNum() << endl;
 
-		for (int i = 0; i < getPosNum() - getUsrsNum(); i++)
+		for (int i = 0; i < getTotalPotentialNodes() - getUsrsNum(); i++)
 		{
 			cout << "y_" << i + getUsrsNum() << ": " << round(solution->yPositions[i]) << endl;
 		}
@@ -1719,14 +1725,14 @@ void printRelaxedSolution(solution_t *solution)
 		cout << "*Valore f. obiettivo: " << solution->objValue << endl;
 		cout << "*Tempo totale impiegato (ms): " << solution->execTime << endl;
 		cout << "*Nodi esplorati: " << solution->openedNodes << endl;
-		for (int i = 0; i < getPosNum() - getUsrsNum(); i++)
+		for (int i = 0; i < getTotalPotentialNodes() - getUsrsNum(); i++)
 		{
 			if (solution->yPositions[i] > 0)
 				count++;
 		}
 		cout << "*Droni impiegati/droni totali: " << count << "/" << getDrnsNum() << endl;
 
-		for (int i = 0; i < getPosNum() - getUsrsNum(); i++)
+		for (int i = 0; i < getTotalPotentialNodes() - getUsrsNum(); i++)
 		{
 			cout << "*y_" << i + getUsrsNum() << ": " << solution->yPositions[i] << endl;
 		}
@@ -1748,7 +1754,7 @@ solution_t *solveLP(CEnv env, Prob lp, string baseFileName, bool verbose, int co
 	cout << "Current memory usage, after post-model: " << getCurrentRSS( ) / 1024 << " KB" << endl;
 	
 	
-	CHECKED_CPX_CALL(CPXwriteprob, env, lp, lpFile.c_str(), NULL);
+	//CHECKED_CPX_CALL(CPXwriteprob, env, lp, lpFile.c_str(), NULL);
 	
 	// optimize
 
@@ -1790,7 +1796,7 @@ solution_t *solveLP(CEnv env, Prob lp, string baseFileName, bool verbose, int co
 	try
 	{
 		double objval = 0;
-		const int size = getPosNum();
+		const int size = getTotalPotentialNodes();
 		double solutionArray[size]; 
 
 		solution = new solution_t;
@@ -1933,7 +1939,7 @@ solution_t *solveHeurLP(CEnv env, Prob lp, string baseFileName, bool verbose, in
 						<< "ms" << " (" << std::chrono::duration_cast<std::chrono::seconds>(end - start).count() << "s c.ca).\n";
 
 					double objval = 0;
-					const int size = getPosNum();
+					const int size = getTotalPotentialNodes();
 					double solutionArray[size]; 
 
 					//solution = new solution_t;
@@ -2028,7 +2034,7 @@ solution_t *getSolution(CEnv env, Prob lp, unsigned long int execTime, string in
 	{
 		instSolution = new solution_t;
 		double objval = 0.0;
-		const int size = getPosNum();
+		const int size = getTotalPotentialNodes();
 		double solutionArray[size];
 
 		CHECKED_CPX_CALL(CPXgetobjval, env, lp, &objval);
@@ -2074,7 +2080,7 @@ solution_t *getHeurSolution(CEnv env, Prob lp, unsigned long int execTime, strin
 	{
 		instSolution = new solution_t;
 		double objval = 0.0;
-		const int size = getPosNum();
+		const int size = getTotalPotentialNodes();
 		double solutionArray[size];
 
 		CHECKED_CPX_CALL(CPXgetobjval, env, lp, &objval);
@@ -2413,4 +2419,42 @@ void swapToCont(CEnv env, Prob lp)
 	
 	
 	CPXchgprobtype (env, lp, CPXPROB_LP) ;//LPOPT 
+}
+
+int dronesCount(solution_t *sol, double threshold)
+{
+	int counter = 0;
+	for(int i = 0; i < (int) sol->yPositions.size(); i++)
+	{
+		if(sol->yPositions[i] >= threshold) //qui le soluzioni sono intere
+		{
+			counter++;
+		}
+	}
+	return counter;
+}
+
+solution_t *copySolution(solution_t *sol)
+{
+	try
+	{
+		solution_t *newSol = new solution_t;
+
+		newSol->instName = sol->instName;
+		newSol->yPositions = sol->yPositions;
+		newSol->objValue = sol->objValue;
+		newSol->statusCode = sol->statusCode;
+		newSol->execTime = sol->execTime;
+		newSol->openedNodes = sol->openedNodes;
+		newSol->rootGap = sol->rootGap;
+		newSol->heurIterationCount = sol->heurIterationCount;
+
+		return newSol;
+	}
+	catch (exception& e)
+	{
+		cerr << __FUNCTION__ << "(): An exception has occurred: " << e.what() << endl;
+		
+		return NULL;
+	}
 }

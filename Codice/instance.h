@@ -38,7 +38,7 @@ extern std::map<int, nodesCoordinates_t> mapGrid;
 
 int getUsrsNum();
 int getDrnsNum();
-int getPosNum();
+//int getPosNum();
 int getCommsNum();
 int getGridL();
 int getGridH();
@@ -50,7 +50,7 @@ int getRXCapacity();
 int getThreshold();
 int getMaxConnections();
 int getTotalPotentialNodes();
-int getTotalNodes();
+//int getTotalNodes();
 double getDeployCost(int);
 int getRequestedTraffic(int,int);
 

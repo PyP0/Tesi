@@ -4,6 +4,7 @@
 #include <iostream>
 #include <string>
 #include <fstream>
+#include <math.h>
 
 #include <cerrno>
 #include <cstring>
@@ -30,16 +31,6 @@ int getRand(int inf, int sup)
 	return distribution(generator);
 }
 
-//generatore pseudo-casuale di numeri int nel range inf - sup
-int getLoadedRand(int inf, int sup)
-{
-	// obtain a seed from the system clock:
-	unsigned int seed1 = std::chrono::system_clock::now().time_since_epoch().count();
-
-	std::mt19937 generator(seed1);   // mt19937 is a standard mersenne_twister_engine
-	std::uniform_int_distribution<int> distribution(inf, sup);
-	return distribution(generator);
-}
 
 // arrotonda numToRound al multiplo di multiple successivo. Es: 10, 7 -> 14
 int roundUp(int numToRound, int multiple)
@@ -92,7 +83,7 @@ bool isIntersection(double x0, double y0, double r0, double x1, double y1, doubl
 		return false;
 }
 
-bool printClusterJob(std::string fName,std::string path, std::string exename, std::string err_out_name, std::string command, std::string variation, std::string home, int time)
+bool printClusterJob(std::string fName,std::string path, std::string exename, std::string err_out_name, std::string command, std::string variation, std::string home, int time, std::string queue)
 {
 	ofstream file;
 	cout << path << endl;
@@ -119,13 +110,13 @@ bool printClusterJob(std::string fName,std::string path, std::string exename, st
 			file <<	"#PBS -e localhost:${HOME}/Cluster/"<<err_out_name<<".err" << endl;
 			file <<	"#PBS -o localhost:${HOME}/Cluster/"<<err_out_name<<".out" << endl;
 			file << endl;
-			file <<	"### Set the queue to \"cluster_long\"" << endl;
-			file <<	"#PBS -q cluster_long" << endl;
+			file <<	"### Set the queue to \""<< queue << "\"" << endl;
+			file <<	"#PBS -q " << queue << endl;
 			file << endl;
 			file <<	"### Specify the number of cpus for your job.  This example will run on 1 cpus " << endl;
 			file <<	"### using 1 nodes with 1 process per node.  " << endl;
 			file <<	"### You MUST specify some number of nodes or Torque will fail to load balance." << endl;
-			file <<	"#PBS -l nodes=1:ppn=8:cluster_intel:ubuntu14" << endl;
+			file <<	"#PBS -l nodes=1:ppn=4:cluster_intel:ubuntu14" << endl;
 			file << endl;
 			file <<	"### You should tell PBS how much memory you expect your job will use.  mem=1g or mem=1024m" << endl;
 			file <<	"#PBS -l mem=32g" << endl;

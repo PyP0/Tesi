@@ -17,7 +17,7 @@ int d = 0;
 //numero di posizioni potenziali dei droni
 int P = 0;
 
-int totalNodes = n + d;
+//int totalNodes = n + d;
 int totalPotentialNodes = P;
 
 //numero di commodities, ovvero numero di coppie distinte sorgente-destinazione
@@ -45,6 +45,10 @@ int epsilonNodeRadius = 15; // metri DATASET3
 int length = 0;
 int height = 0;
 int step = 0;
+
+int extLength = 0; //NEWGRID
+int extHeight = 0;
+int extStep = 1;
 
 std::vector< nodesCoordinates_t > grid;
 
@@ -121,10 +125,10 @@ int getDrnsNum()
 	return d;
 }
 
-int getPosNum()
+/*int getPosNum()
 {
 	return P;
-}
+}*/
 
 int getCommsNum()
 {
@@ -181,10 +185,10 @@ int getTotalPotentialNodes()
 	return totalPotentialNodes;
 }
 
-int getTotalNodes()
+/*int getTotalNodes()
 {
 	return totalNodes;
-}
+}*/
 
 double getInterference(int i, int j)
 {
@@ -295,6 +299,204 @@ static void convertIntoBMatrix()
 		cerr << __FUNCTION__ << "(): Strutture dati non allocate." << endl;
 	}
 }
+
+static int checkValidity(vector< pair< int, int > > usersCoords)
+{
+	//controlla unicità
+	int count = -1;
+	for(int i = 0; i < (int)usersCoords.size() && count == -1; i++)
+	{
+		for(int j = i+1; j < (int)usersCoords.size() && count == -1; j++)
+		{
+			if(i != j)
+			{
+				if(usersCoords[i].first == usersCoords[j].first && usersCoords[i].second == usersCoords[j].second)
+				{
+					cout << "Trovati duplicati: " << endl; //debug
+					cout << usersCoords[i].first << " " << usersCoords[j].first << endl;
+					cout << usersCoords[i].second << " " << usersCoords[j].second << endl;
+					count = j;
+				}
+			}
+		}
+	}
+	return count;
+}
+
+static void positionUsers(vector< pair< int, int > > &usersCoords)
+{
+	double r = floor(nodeRadius/2);
+		//int j = 0;
+	/*cout << "Coordinate ammissibili quadranti: " << endl;
+	cout << "4) " << 0 << "," << 0 << "    " << extLength << "," << r - extStep << endl;
+	cout << "3) " << extLength - r +extStep << "," << 0 << "    " << extLength << "," << extHeight << endl;
+	cout << "2) " << 0 << "," << extHeight - r + extStep << "    " << extLength << "," << extHeight << endl;
+	cout << "1) " << 0 << "," << 0 << "    " << r - extStep << "," << extHeight << endl;*/
+	for(int i = 0; i < n ; i++)
+	{
+
+		//quadrante 4
+		if( i % 4 == 0)
+		{
+			usersCoords[i].first = roundUp(getRand(0, extLength), extStep);
+			usersCoords[i].second = roundUp(getRand(0, r-extStep), extStep);
+		}
+
+		//quadrante 3
+		if( i % 4 == 1)
+		{
+			usersCoords[i].first = roundUp(getRand(extLength - r + extStep, extLength), extStep);
+			usersCoords[i].second = roundUp(getRand(0, extHeight), extStep);
+		}
+
+		//quadrante 2
+		if( i % 4 == 2)
+		{
+			usersCoords[i].first = roundUp(getRand(0, extLength), extStep);
+			usersCoords[i].second = roundUp(getRand(extHeight - r + extStep, extHeight), extStep);
+		}
+
+		//quadrante 1
+		if( i % 4 == 3)
+		{
+			usersCoords[i].first = roundUp(getRand(0, r -extStep), extStep);
+			usersCoords[i].second = roundUp(getRand(0, extHeight), extStep);
+		}
+		cout <<" utente " << i << " (" << usersCoords[i].first << "," << usersCoords[i].second << ")" <<endl;
+	}
+}
+
+static int placeUsersSere() // #thankstopattaro
+{
+	extLength = (length-1) * step + nodeRadius;
+	extHeight = (height-1) * step + nodeRadius;
+	//cout << "extLength: " << extLength << endl;
+	//cout << "extHeight " << extHeight << endl;
+	extStep = step;
+	if (grid.size() > 0 && n > 0)
+	{
+		vector< pair< int, int > > usersCoords(n);
+		
+		positionUsers(usersCoords);
+
+		/*usersCoords[0].first = 25;
+		usersCoords[0].second = 25;
+		usersCoords[4].first = 25;
+		usersCoords[4].second = 25;*/
+		//controlla unicità
+		int count = checkValidity(usersCoords);
+
+		int abort = 0;
+		while(count != -1 && abort <= 500)
+		{
+			positionUsers(usersCoords);
+			count = checkValidity(usersCoords);
+			abort++;
+		}
+
+		if(abort > 500)
+		{
+			cerr << __FUNCTION__ << "(): Impossibile posizionare gli utenti." << endl;
+			return 1;
+		}
+		else // tutti distinti
+		{	
+
+			//assegnazione id ai nodi P
+			int progressiveId = n;  
+			for(unsigned int i=0; i < grid.size(); i++)
+			{
+				if(grid[i].isUser == false)
+				{
+					grid[i].id = progressiveId;
+					progressiveId++;
+				}
+			}
+
+			//add the users
+			for(int i = 0; i < n; i++)
+			{
+				mapGrid[i].id = i;
+				mapGrid[i].isUser = true; 
+				mapGrid[i].x = usersCoords[i].first; 
+				mapGrid[i].y = usersCoords[i].second; 	
+			}
+
+			//filling the map
+			//int gridIndex = n;
+			for(unsigned int i= 0; i < grid.size(); i++)
+			{
+				mapGrid[i+n].id = i+n;
+				mapGrid[i+n].isUser = grid[i].isUser; 
+				mapGrid[i+n].x = grid[i].x; 
+				mapGrid[i+n].y = grid[i].y; 
+			}
+
+			/*for(unsigned int i=0; i< mapGrid.size();i++)
+			{
+				cout<< i <<")"<<endl;
+				cout<< mapGrid[i].id << " ";
+				cout<< mapGrid[i].isUser << " ";
+				cout<< mapGrid[i].x << " ";
+				cout<< mapGrid[i].y <<endl;
+			}*/
+			return 0;
+		}
+	}
+	else
+	{
+		cerr << __FUNCTION__ << "(): Uno o piu' parametri sono errati." << endl;
+		return 1;
+	}
+}
+
+//alloca e popola un vettore per ospitare le coordinate di tutti i punti 
+static int createGrid(int startX, int startY)
+{
+	if (length >0 && height > 0 && step >0 && startX >= 0 && startY >= 0)
+	{
+		//int xCoord = 0, yCoord = 0; //NEWGRID
+		int xCoord = startX, yCoord = startY;
+		int rows = 0;
+		int index = 0;
+		try
+		{
+			grid.resize(length*height);
+			for (int a = 0; a<height; a++)
+			{
+				//xCoord = 0; NEWGRID
+				xCoord = startX;
+
+				for (int b = 0; b< length; b++)
+				{
+					grid[index].isUser = false;
+
+					grid[index].x = xCoord;
+					xCoord += step;
+
+					grid[index].y = yCoord;
+
+					index++;
+				}
+				rows++;
+				yCoord += step;
+			}
+			return 0;
+		}
+		catch (exception &e)
+		{
+			cerr << __FUNCTION__ << "(): An exception has occurred: " << e.what() << endl;
+			return 1;
+		}
+	}
+	else
+	{
+		cerr << __FUNCTION__ << "(): Uno o piu' parametri sono errati.";
+		//return empty vector
+		return 1;
+	}
+}
+
 
 static int placeUsersFallback() //tolto il vincolo di distanza
 {
@@ -424,24 +626,25 @@ static int placeUsersFallback() //tolto il vincolo di distanza
 			{
 				int gridIndex = grid[i].id;
 
+				//operator [key] adds a new element to map if key index doesn't exists yet
 				mapGrid[gridIndex].id = i;
 				mapGrid[gridIndex].isUser = grid[i].isUser; 
 				mapGrid[gridIndex].x = grid[i].x; 
 				mapGrid[gridIndex].y = grid[i].y; 
 			}
 		}
-		cout << "grid"<< endl;
+		/*cout << "grid"<< endl;
 			 for(unsigned int i=0; i < grid.size(); i++)
 			{
 				cout << i <<") " << grid[i].id << endl;
-			}
+			}*/
 			
 		for(unsigned int i=0; i< mapGrid.size();i++)
 		{
 			cout<< i <<")"<<endl;
-			cout<< mapGrid[i].id <<endl;
-			cout<< mapGrid[i].isUser <<endl;
-			cout<< mapGrid[i].x <<endl;
+			cout<< mapGrid[i].id << " ";
+			cout<< mapGrid[i].isUser << " ";
+			cout<< mapGrid[i].x << " ";
 			cout<< mapGrid[i].y <<endl;
 		}
 		return 0;
@@ -453,55 +656,8 @@ static int placeUsersFallback() //tolto il vincolo di distanza
 	}
 }
 
+
 /*static int placeUsersSere()
-{
-	if (grid.size() > 0 && n > 0)
-	{
-		unordered_map<int, int> mapPool;
-		int size = length * height;
-		
-		mapPool.reserve(size);
-		for (int i = 0; i < size; i++)
-		{
-			mapPool[i] = i;
-			grid[i].isUser = false;
-			grid[i].id = -1;
-		}
-		
-		//
-		
-		
-		//assegnazione id ai nodi P
-		int progressiveId = n;  
-		for(unsigned int i=0; i < grid.size(); i++)
-		{
-			if(grid[i].isUser == false)
-			{
-				grid[i].id = progressiveId;
-				progressiveId++;
-			}
-		}
-
-			
-		//filling the map
-		for(unsigned int i=0; i < grid.size(); i++)
-		{
-			int gridIndex = grid[i].id;
-
-			mapGrid[gridIndex].id = i;
-			mapGrid[gridIndex].isUser = grid[i].isUser; 
-			mapGrid[gridIndex].x = grid[i].x; 
-			mapGrid[gridIndex].y = grid[i].y; 
-		}
-	}
-	else
-	{
-		cerr << __FUNCTION__ << "(): Uno o piu' parametri sono errati." << endl;
-		return 1;
-	}
-}*/
-
-static int placeUsersSere()
 {
 	if (grid.size() > 0 && n > 0)
 	{
@@ -645,61 +801,17 @@ static int placeUsersSere()
 		cerr << __FUNCTION__ << "(): Uno o piu' parametri sono errati." << endl;
 		return 1;
 	}
-}
+}*/
 
 
-//alloca e popola un vettore per ospitare le coordinate di tutti i punti 
-static int createGrid()
-{
-	if (length >0 && height > 0 && step >0)
-	{
-		int xCoord = 0, yCoord = 0;
-		int rows = 0;
-		int index = 0;
-		try
-		{
-			grid.resize(length*height);
-			for (int a = 0; a<height; a++)
-			{
-				xCoord = 0;
-
-				for (int b = 0; b< length; b++)
-				{
-					grid[index].isUser = false;
-
-					grid[index].x = xCoord;
-					xCoord += step;
-
-					grid[index].y = yCoord;
-
-					index++;
-				}
-				rows++;
-				yCoord += step;
-			}
-			return 0;
-		}
-		catch (exception &e)
-		{
-			cerr << __FUNCTION__ << "(): An exception has occurred: " << e.what() << endl;
-			return 1;
-		}
-	}
-	else
-	{
-		cerr << __FUNCTION__ << "(): Uno o piu' parametri sono errati.";
-		//return empty vector
-		return 1;
-	}
-}
 
 static int initDataStructures(int n, int d, int P)
 {
 	int success = 0;
 	if (n > 0 && d > 0 && P > 0)
 	{
-		totalNodes = n + d;
-		totalPotentialNodes =  P;
+		//totalNodes = n + d;
+		totalPotentialNodes =  P+n;
 		K = n*(n - 1);
 
 		try
@@ -739,7 +851,10 @@ static int initDataStructures(int n, int d, int P)
 				interference[i].resize(totalPotentialNodes,-1);
 			}
 
-			success = createGrid();
+			//cout << floor(nodeRadius/2.0) << endl;
+			//cout << floor(nodeRadius/2.0) << endl;
+			success = createGrid(floor(nodeRadius/2.0),floor(nodeRadius/2.0));
+			//printGrid();
 		}
 		catch (exception& e)
 		{
@@ -838,16 +953,16 @@ static int createRandomInstance(int users, int drones, int tInf, int tSup, doubl
 {
 	int result=0;
 	
-	if(users > 0 && drones > 0 && gridLength > 0 && gridHeight >0 && gridStep >0 && (users < gridLength*gridHeight) )
+	if(users > 0 && drones > 0 && gridLength > 0 && gridHeight >0 && gridStep >0  )
 	{
-		n=users;
-		d=drones;
+		n = users;
+		d = drones;
 		
 		length = gridLength;
 		height = gridHeight;
-		P= length*height;  
+		P = length*height;  
 		step = gridStep; 
-		result= initDataStructures(users,drones,gridLength*gridHeight);
+		result = initDataStructures(users,drones,gridLength*gridHeight);
 		if(result==0)
 		{
 			//TODO
@@ -855,7 +970,8 @@ static int createRandomInstance(int users, int drones, int tInf, int tSup, doubl
 			do
 			{
 				//result = placeUsersSere(); 
-				result = placeUsersFallback();
+				//result = placeUsersFallback(); NEWGRID
+				result = placeUsersSere();
 				trials--;
 			}
 			while(result != 0 && trials > 0 );
@@ -924,10 +1040,13 @@ int createBatchInstances(int instQuantity, vector<int> users, vector<int> drones
 		string exename1("INT");
 		string home1("nodistESATTO");
 		string home2("nodistEURIST");
+
+		string queueShort("cluster_short");
+		string queueLong("cluster_long");
 		
 		string filepath1(home1 + "/" +variation+ "/i01");
-		int time = 5;
-		if(printClusterJob("main.job",(folderName), (exename1 + variation), filepath1, command1, variation, home1, time) == false)
+		int time = 3;
+		if(printClusterJob("main.job",(folderName), (exename1 + variation), filepath1, command1, variation, home1, time, queueShort) == false)
 			cerr << __FUNCTION__ << "(): Impossibile creare file di job." <<endl;
 			
 		string command2("./main -X ../");
@@ -935,7 +1054,7 @@ int createBatchInstances(int instQuantity, vector<int> users, vector<int> drones
 		string filepath2(home2 +"/" +variation + "/h01");
 		time = 50;
 		
-		if(printClusterJob("mainH.job",(folderName), (exename2 + variation), filepath2, command2, variation, home2, time) == false)
+		if(printClusterJob("mainH.job",(folderName), (exename2 + variation), filepath2, command2, variation, home2, time, queueLong) == false)
 			cerr << __FUNCTION__ << "(): Impossibile creare file di job." <<endl;
 		
 		file.open(fileName, ios::out);
@@ -1081,7 +1200,7 @@ int loadInstance(const char *filename)
 	//long int sparseCounter = 0, nnzCounter = 0; //debug
 
 	n = 0, d = 0, P = 0;
-	totalNodes = 0;
+	//totalNodes = 0;
 	totalPotentialNodes = 0;
 
 	file.open(filename, ios::in);
@@ -1091,12 +1210,18 @@ int loadInstance(const char *filename)
 		{
 			file >> n >> d >> P;
 
-			totalNodes = n + d;
+			//totalNodes = n + d;
 			totalPotentialNodes =  P;
 
 			file >> s >> threshold >> droneTXCapacity;
 			file >> droneRXCapacity >> nodeRadius;
 			file >> length >> height >> step;
+
+			//NEWGRID
+			extLength = length * step + nodeRadius;
+			extHeight = height * step + nodeRadius;
+
+
 			if (n > 0 && d > 0 && P > 0)
 			{
 				if (initDataStructures(n, d, P) == 0)
