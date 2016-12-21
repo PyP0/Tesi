@@ -7,6 +7,8 @@
 #include <time.h>
 #include <string>
 #include <math.h>
+#include <vector>
+#include <chrono>
 #include "cpxmacro.h"
 #include "instance.h"
 #include "utility.h"
@@ -48,7 +50,7 @@ vector< string > loadFileList(string masterFile)
 	}
 	else
 	{
-		cerr << __FUNCTION__ << "(): Impossibile aprire il file: " << file << endl;
+		cout << "(): Impossibile aprire il file: " << fileLine << endl;
 		return fileList;
 	}
 }
@@ -183,6 +185,23 @@ int executeMaster(vector< string > fileList, string masterSolutionsFile, bool ve
 			cerr << __FUNCTION__ << "(): Impossibile scrivere i risultati sul file: " << masterSolutionsFile << endl;
 		}
 
+		cout << "File list: " << endl;
+		for(unsigned int i = 0; i < fileList.size(); i++)
+		{
+			cout << fileList[i] << endl;
+		}
+
+		//column names
+		file << "Istanza\t";
+		file << "Tempo (sec)\t";
+		file << "# droni\t";
+		file << "Opened Nodes\t";
+		file << "Best Obj\t";
+		file << "Cutoff\t";
+		file << "Cuts\t";
+		file << "Gap\t";
+		file << "Status" << endl;
+
 		for(unsigned int i = 0; i < fileList.size(); i++)
 		{
 			instSolution = executeInstance(fileList[i],verbose,contRelax);
@@ -204,9 +223,16 @@ int executeMaster(vector< string > fileList, string masterSolutionsFile, bool ve
 					file << instSolution->instName.substr(13,string::npos) << "\t";
 					//file << instSolution->objValue << "\t";
 					file << instSolution->execTime << "\t";
-					file << dronesCount << "/" << getDrnsNum() << "\t";
+					//file << dronesCount << "/" << getDrnsNum() << "\t";
+					file << dronesCount << "\t";
 					file << instSolution->openedNodes << "\t";
+					file << instSolution->bestobj << "\t";
+					file << instSolution->cutoff << "\t";
+					file << instSolution->cuts << "\t";
+					file << instSolution->gap << "\t";
+
 					file << instSolution->statusCode << endl;
+
 
 					delete instSolution;
 				}
@@ -257,6 +283,8 @@ int main(int argc, char const *argv[])
 		string basePath("../");
 		string folderName( basePath +  to_string(users[0]) + "_" + to_string( gridL[0] * gridH[0]) + "/"  );
 		
+		//int tInf = 0;
+		//int tSup = floor(getTXCapacity() * 18.0 / 100.0); //test
 		//DATASET
 			createBatchInstances(
 			3, //instQuantity
@@ -266,7 +294,7 @@ int main(int argc, char const *argv[])
 			gridH,  //gridHeight
 			step,  //gridStep
 			0, 	//tInf
-			150, //tSup
+			40, //tSup
 			5,	//cInf
 			10, //cSup
 			200, //dInf
@@ -567,10 +595,16 @@ int main(int argc, char const *argv[])
 			}
 		}*/
 
-		if(argc == 3 && string(argv[1]).compare(string("-X")) == 0)
+		if(string(argv[1]).compare(string("-X")) == 0)
 		{
 			string pathToMaster(argv[2]);
 			pathToMaster = pathToMaster + MASTER_FILE;
+
+			if(argc == 4)
+			{
+				int gridType = atoi(argv[3]);
+				setSpecialGrid(gridType);
+			}
 
 			DECL_ENV(env);
 			//string pathToMasterSolFile(argv[2]);
@@ -591,6 +625,17 @@ int main(int argc, char const *argv[])
 					//int count[1];
 					vector < int > yValue;
 
+					csvFile << "Istanza\t";
+					csvFile << "Tempo (sec)\t";
+					csvFile << "# droni\t";
+					csvFile << "Opened Nodes\t";
+					csvFile << "Best Obj\t";
+					csvFile << "Cutoff\t";
+					csvFile << "Cuts\t";
+					csvFile << "Gap\t";
+					csvFile << "Status\t";
+					csvFile <<"Iteration Count\t";
+					csvFile << "Drones: " << endl;
 					for(unsigned int i = 0; i < listOfInstance.size(); i++)
 					{	
 						//solve 1
@@ -607,8 +652,12 @@ int main(int argc, char const *argv[])
 							
 							cout << "Instance " << listOfInstance[i] << " loaded." << endl;
 							
-
-							solution_t * heurSol = solve(env,lp1, listOfInstance[i].c_str(), false);
+							std::chrono::high_resolution_clock::time_point heustart;
+							heustart = std::chrono::high_resolution_clock::now(); 
+							solution_t * heurSol = solve3(env,lp1, listOfInstance[i].c_str(), true);
+							cout << "***TEMPO TOTALE IMPIEGATO: " 
+							<< std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - heustart).count() //casting per la conversione in millisecondi; (end-start).count() calcola la differenza di tempo e la restituisce come valore numerico
+							<< "ms. \n";
 							//printSolution(heurSol);
 							// free
 							
@@ -619,7 +668,11 @@ int main(int argc, char const *argv[])
 								cerr << __FUNCTION__ << "(): Soluzione non trovata per l'istanza " << listOfInstance[i] << endl;
 								csvFile << listOfInstance[i] << '\t';
 								csvFile << "-1" << '\t';
-								//csvFile << "-1" << '\t';
+								csvFile << "-1" << '\t';
+								csvFile << "-1" << '\t';
+								csvFile << "-1" << '\t';
+								csvFile << "-1" << '\t';
+								csvFile << "-1" <<'\t';
 								csvFile << "-1" << '\t';
 								csvFile << "-1" << '\t';
 								csvFile << "-1" << '\t';
@@ -633,11 +686,8 @@ int main(int argc, char const *argv[])
 								cout << heurSol->objValue << endl;
 								cout << heurSol->execTime << endl;
 								cout << heurSol->statusCode << endl << endl;*/
-								csvFile << listOfInstance[i] << '\t';
-								//csvFile << heurSol->objValue << '\t';
-								csvFile << heurSol->execTime << '\t';
-								csvFile << heurSol->statusCode << '\t';
-								csvFile << heurSol->heurIterationCount << '\t';
+
+
 								int dronesCount = 0;
 									
 								for(unsigned int l = 0; l < heurSol->yPositions.size(); l++)
@@ -650,8 +700,19 @@ int main(int argc, char const *argv[])
 										yValue.push_back(l);
 									}
 								}
-										
-								csvFile <<  dronesCount << "/" << getDrnsNum() << '\t';
+									
+								csvFile << listOfInstance[i] << '\t';
+								//csvFile << heurSol->objValue << '\t';
+								csvFile << heurSol->execTime << '\t';
+								csvFile << dronesCount << "\t";
+								csvFile << heurSol->openedNodes << "\t";
+								csvFile << heurSol->bestobj << "\t";
+								csvFile << heurSol->cutoff << "\t";
+								csvFile << heurSol->cuts << "\t";
+								csvFile << heurSol->gap << "\t";
+
+								csvFile << heurSol->statusCode << '\t';
+								csvFile << heurSol->heurIterationCount << '\t';				
 
 								for(unsigned int l = 0; l < yValue.size(); l++)
 								{
@@ -667,7 +728,7 @@ int main(int argc, char const *argv[])
 								yValue.clear();
 							}
 							CPXfreeprob(env, &lp1);
-							//csvFile << endl;
+							csvFile << endl;
 						}
 
 
@@ -697,12 +758,17 @@ int main(int argc, char const *argv[])
 							if(heurSol == NULL)
 							{
 								cerr << __FUNCTION__ << "(): Soluzione non trovata per l'istanza " << listOfInstance[i] << endl;
-								
-								//csvFile << "-1" << '\t';
+								csvFile << listOfInstance[i] << '\t';
 								csvFile << "-1" << '\t';
 								csvFile << "-1" << '\t';
 								csvFile << "-1" << '\t';
 								csvFile << "-1" << '\t';
+								csvFile << "-1" << '\t';
+								csvFile << "-1" <<'\t';
+								csvFile << "-1" << '\t';
+								csvFile << "-1" << '\t';
+								csvFile << "-1" << '\t';
+								csvFile << "-1" <<'\t';
 								csvFile << endl;
 							}
 							else
@@ -710,9 +776,6 @@ int main(int argc, char const *argv[])
 								//printSolution(heurSol);
 								
 								//csvFile << heurSol->objValue << '\t';
-								csvFile << heurSol->execTime << '\t';
-								csvFile << heurSol->statusCode << '\t';
-								csvFile << heurSol->heurIterationCount << '\t';
 								int dronesCount = 0;
 									
 								for(unsigned int l = 0; l < heurSol->yPositions.size(); l++)
@@ -725,8 +788,19 @@ int main(int argc, char const *argv[])
 										yValue.push_back(l);
 									}
 								}
-										
-								csvFile <<  dronesCount << "/" << getDrnsNum() << '\t';
+									
+								csvFile << listOfInstance[i] << '\t';
+								//csvFile << heurSol->objValue << '\t';
+								csvFile << heurSol->execTime << '\t';
+								csvFile << dronesCount << "\t";
+								csvFile << heurSol->openedNodes << "\t";
+								csvFile << heurSol->bestobj << "\t";
+								csvFile << heurSol->cutoff << "\t";
+								csvFile << heurSol->cuts << "\t";
+								csvFile << heurSol->gap << "\t";
+
+								csvFile << heurSol->statusCode << '\t';
+								csvFile << heurSol->heurIterationCount << '\t';	
 
 								for(unsigned int l = 0; l < yValue.size(); l++)
 								{
@@ -870,6 +944,25 @@ int main(int argc, char const *argv[])
 
 		if(string(argv[1]).compare(string("-a")) == 0)
 		{
+			// no flight zones special grids
+			if(argc == 4) // BTNGRIDS it's a miserable workaround, no time to implement nicely, apologies
+			{
+				contRelax[0] = 0;
+				string pathToMaster(argv[2]);
+				pathToMaster = pathToMaster + MASTER_FILE;
+
+				string pathToMasterSolFile(argv[2]);
+				pathToMasterSolFile = pathToMasterSolFile + MASTER_SOLUTIONS_FILE;
+
+				int gridType = atoi(argv[3]);
+				setSpecialGrid(gridType);
+				
+				int status = executeMaster(loadFileList(pathToMaster.c_str()), pathToMasterSolFile.c_str(), true, contRelax);
+
+				cout << "Max physical memory usage: " << getPeakRSS( ) << " KB" << endl;
+
+				return status;
+			}
 			if(argc == 3)
 			{
 				contRelax[0] = 0;

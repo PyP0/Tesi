@@ -52,6 +52,10 @@ vector <int> sIDX;
 
 int bigM = 1000000; //default value
 
+int specialGrid = 0; // BTNGRIDS it's a miserable workaround, no time to implement nicely, apologies
+
+
+
 static bool areOutOfSight(int i, int j) //TODO: controllarne effettiva funzionalita'
 {
 	if(getDistance(mapGrid[i].x, mapGrid[i].y, mapGrid[j].x, mapGrid[j].y) <= getNodeRadius())
@@ -77,9 +81,29 @@ static bool areOutOfSight(int i, int j) //TODO: controllarne effettiva funzional
 	return flag;*/
 }
 
+void setSpecialGrid(int g)
+{
+	specialGrid = g;
+}
+
 int gety_index()
 {
 	return y_index;
+}
+
+int getz_index()
+{
+	return z_index;
+}
+
+int gets_index()
+{
+	return s_index;
+}
+
+int getsupera_index()
+{
+	return supera_index;
 }
 
 static void setupLP(CEnv env, Prob lp, int contRelax[])
@@ -94,8 +118,6 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 
 	vector< vector<int> > xMap(getTotalPotentialNodes(), vector<int>(getTotalPotentialNodes(), -1));
 
-	//vector< vector<int> > wMap(getTotalPotentialNodes(), vector<int>(getTotalPotentialNodes(), -1));
-
 	vector< vector<int> > zMap(getTotalPotentialNodes(), vector<int>(getTotalPotentialNodes(), -1));
 
 	
@@ -107,7 +129,7 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 	char ftype; 
 	
 	if( (contRelax[0] & 16) != 16) //rilassamento continuo?
-		ftype = 'I';
+		ftype = 'C';
 	else
 	{
 		ftype = 'C'; 
@@ -381,143 +403,35 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 	int rowNumber = 0;
 	double bigM = 0.0;
 	
-
-	// Test pre euristica: y_i >= 1
-	/*idx.clear();
-	coef.clear();
-	for(int i=5; i< getTotalPotentialNodes(); i++)
-	{
-		if(i == 11 || i == 20 || i == 23)
-		{
-			sense = 'G';
-			matbeg = 0;
-
-			idx.push_back(y_index + i - getUsrsNum());
-			coef.push_back(1.0);
-
-			snprintf(name, NAME_SIZE, "cY_%d", rowNumber); //numerazione progressiva dei vincoli
-			char* rowname_ = (char*)(&name[0]);
-			rowNumber++;
-
-			CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idx.size(), &uno, &sense, &matbeg, &idx[0], &coef[0], NULL, &rowname_);
-			idx.clear();
-			coef.clear();
-		}
-		else
-		{
-			sense = 'E';
-			matbeg = 0;
-			idx.push_back(y_index + i - getUsrsNum());
-			coef.push_back(1.0);
-			snprintf(name, NAME_SIZE, "cY_%d", rowNumber); //numerazione progressiva dei vincoli
-			char* rowname_ = (char*)(&name[0]);
-			rowNumber++;
-
-			CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idx.size(), &zero, &sense, &matbeg, &idx[0], &coef[0], NULL, &rowname_);
-			idx.clear();
-			coef.clear();
-		}
-	}*/
-
-	/*sense = 'G';
-	matbeg = 0;
-	idx.clear();
-	coef.clear();
-	idx.push_back(y_index + 11 - getUsrsNum());
-	coef.push_back(1.0);
-
-	snprintf(name, NAME_SIZE, "cY_%d", rowNumber); //numerazione progressiva dei vincoli
-	char* rowname_ = (char*)(&name[0]);
-	rowNumber++;
-
-	CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idx.size(), &uno, &sense, &matbeg, &idx[0], &coef[0], NULL, &rowname_);
-	idx.clear();
-	coef.clear();
-	
-	//
-	
-	idx.push_back(y_index + 20 - getUsrsNum());
-	coef.push_back(1.0);
-
-	snprintf(name, NAME_SIZE, "cY_%d", rowNumber); //numerazione progressiva dei vincoli
-	rowname_ = (char*)(&name[0]);
-	rowNumber++;
-
-	CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idx.size(), &uno, &sense, &matbeg, &idx[0], &coef[0], NULL, &rowname_);
-	idx.clear();
-	coef.clear();
-
-	//
-
-	idx.push_back(y_index + 23 - getUsrsNum());
-	coef.push_back(1.0);
-
-	snprintf(name, NAME_SIZE, "cY_%d", rowNumber); //numerazione progressiva dei vincoli
-	rowname_ = (char*)(&name[0]);
-	rowNumber++;
-
-	CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idx.size(), &uno, &sense, &matbeg, &idx[0], &coef[0], NULL, &rowname_);
-	idx.clear();
-	coef.clear();*/
-
-
-	//
-
-	/*idx.push_back(y_index + 20 - getUsrsNum());
-	coef.push_back(1.0);
-
-	snprintf(name, NAME_SIZE, "cY_%d", rowNumber); //numerazione progressiva dei vincoli
-	rowname_ = (char*)(&name[0]);
-	rowNumber++;
-
-	CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idx.size(), &uno, &sense, &matbeg, &idx[0], &coef[0], NULL, &rowname_);
-	idx.clear();
-	coef.clear();
-
-	//
-
-	idx.push_back(y_index + 23 - getUsrsNum());
-	coef.push_back(1.0);
-
-	snprintf(name, NAME_SIZE, "cY_%d", rowNumber); //numerazione progressiva dei vincoli
-	rowname_ = (char*)(&name[0]);
-	rowNumber++;
-
-	CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idx.size(), &uno, &sense, &matbeg, &idx[0], &coef[0], NULL, &rowname_);
-	idx.clear();
-	coef.clear();*/
-
-	// 1. conservazione flusso (8)
+	// 2. conservazione flusso (8)
 	sense = 'E';
 	matbeg = 0;
 	coef.clear();
 	idx.clear();
-	for (int v = 0; v < getTotalPotentialNodes(); v++)
+	for (int v = 0; v < getTotalPotentialNodes(); v++) // V'
 	{
-		for (int k = 0; k < getCommsNum(); k++)
+		for (int k = 0; k < getCommsNum(); k++) // K
 		{
-			for (int i = 0; i < getTotalPotentialNodes(); i++)
+			for (int i = 0; i < getTotalPotentialNodes(); i++) // V'
 			{
-				//if (i != v && graph[i][v] != 0)
-				//if (i != v && !(v < n && i < n)) //condizione più generale, include le fijk di nodi tra cui non ci sono link
-				if (i != v && fMap[i][v][k] != -1) //*** a meno della presenza di nodi isolati, ci sarà per ogni vincolo almeno una coppia di f tc fmap[][][]!=-1
+				if (i != v && fMap[i][v][k] != -1) 
 				{
 					idx.push_back(fMap[i][v][k]);
 					coef.push_back(1.0);
 				}
 			}
 
-			for (int j = 0; j < getTotalPotentialNodes(); j++)
+			for (int j = 0; j < getTotalPotentialNodes(); j++) // V'
 			{
-				//if (v != j && graph[v][j] != 0)
-				if (v != j && fMap[v][j][k] != -1) //***condizione più generale, include le fijv di nodi tra cui non ci sono link
+				
+				if (v != j && fMap[v][j][k] != -1) 
 				{
 					idx.push_back(fMap[v][j][k]);
 					coef.push_back(-1.0);
 				}
 			}
 
-			snprintf(name, NAME_SIZE, "c1_%d", rowNumber); //numerazione progressiva dei vincoli
+			snprintf(name, NAME_SIZE, "c2_%d", rowNumber); //numerazione progressiva dei vincoli
 			char* rowname = (char*)(&name[0]);
 			rowNumber++;
 
@@ -528,13 +442,335 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 
 		}
 	}
-	//cout << "Vincoli (1) creati\n";
+
+	// 3 gestione flussi TX 1.5  Sum(Sum(f_ijk)) <= U_tx * y_i 
+	sense = 'L';
+	matbeg = 0;
+	coef.clear();
+	idx.clear();
+
+	for(int i = getUsrsNum(); i < getTotalPotentialNodes(); i++)  // P
+	{
+		// somma f_i_j_k (1)
+		for(int j = 0; j < getTotalPotentialNodes(); j++) // V'
+		{
+			for(int k = 0; k < getCommsNum(); k++)
+			{
+				if (i != j && fMap[i][j][k] != -1)
+				{
+					idx.push_back(fMap[i][j][k]);
+					coef.push_back(1.0 + (getInterference(j,i)/getReductionFactor()));
+				}
+			}
+		}
+
+		if(coef.size() > 0)
+		{
+			idx.push_back( y_index + i - getUsrsNum() );
+			coef.push_back( -getTXCapacity() );
+			//rhs = getTXCapacity() - rhs; 
+
+			snprintf(name, NAME_SIZE, "c3_%d", rowNumber); //numerazione progressiva dei vincoli
+			char* rowname = (char*)(&name[0]);
+			rowNumber++;
+
+			CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idx.size(), &zero, &sense, &matbeg, &idx[0], &coef[0], NULL, &rowname);
+			idx.clear();
+			coef.clear();
+		}
+	}
+
+	// 4.  Sum(f_jik) <= U_rx * (y_i - s_i)  (1) 1.5
+	sense = 'L'; 
+	matbeg = 0;
+	coef.clear();
+	idx.clear();
+	for(int i = getUsrsNum(); i < getTotalPotentialNodes(); i++) // P
+	{
+		// sommatoria f_j_i_k
+		for(int j = 0; j < getTotalPotentialNodes(); j++)  // V'
+		{
+			for (int k = 0; k < getCommsNum(); k++)  // K
+			{
+				if (i != j && fMap[j][i][k] != -1) // f_j_i_k esiste
+				{
+					idx.push_back(fMap[j][i][k]);
+					coef.push_back(1.0);
+				}
+			}
+		}
+
+		// Urx * y_i
+		idx.push_back(y_index + i - getUsrsNum()); //y_i
+		coef.push_back(-getRXCapacity());
+
+		// Urx * s_i
+		idx.push_back(s_index + i);
+		coef.push_back(1.0);
+
+		snprintf(name, NAME_SIZE, "c4_%d", rowNumber); //numerazione progressiva dei vincoli
+		char* rowname = (char*)(&name[0]);
+		rowNumber++;
+
+		CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idx.size(), &zero, &sense, &matbeg, &idx[0], &coef[0], NULL, &rowname);
+		idx.clear();
+		coef.clear();
+	}	
+	//cout << "Vincoli (5) creati\n";
+
+
+	// 5. zi >= yj  versione 1.5
+	matbeg = 0;
+	coef.clear();
+	idx.clear();
+	sense = 'G';
+
+	for(int i = getUsrsNum(); i < getTotalPotentialNodes(); i++)  // P
+	{
+		for(int j = getUsrsNum(); j < getTotalPotentialNodes(); j++)  // P
+		{
+			if( i != j )
+			{
+				double distance = getDistance(mapGrid[i].x, mapGrid[i].y, mapGrid[j].x, mapGrid[j].y);	
+				if(distance <= getEpsilonNodeRadius())
+				{
+					idx.push_back(z_index + i);
+					coef.push_back(1.0);
+					
+					idx.push_back(y_index + j - getUsrsNum());
+					coef.push_back(-1.0);
+
+					snprintf(name, NAME_SIZE, "c5_%d", rowNumber); //numerazione progressiva dei vincoli
+					char* rowname = (char*)(&name[0]);
+					rowNumber++;
+
+					CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idx.size(), &zero, &sense, &matbeg, &idx[0], &coef[0], NULL, &rowname);
+					idx.clear();
+					coef.clear();
+				}
+			}
+		}
+	}
+
+
+	// 6. Sum(A_ji * y_j) + Sum(A_ji) <= S_max + (M  - Smax)*sp_i   1.5
+
+	//bigM = 2 * reductionFactor; //set the big M value for each specific constraint
+	sense = 'L'; 
+	matbeg = 0;
+	coef.clear();
+	idx.clear();
+
+	for(int i = getUsrsNum(); i < getTotalPotentialNodes(); i++)  // P
+	{
+		double rhs = 0;
+		///int bigMMultiplyCounter = 0;
+		bigM = 0.0;
+
+		// sum Aji * y_j su P
+		for(int j = getUsrsNum(); j < getTotalPotentialNodes(); j++)  // P
+		{
+			double distance = getDistance(mapGrid[i].x, mapGrid[i].y, mapGrid[j].x, mapGrid[j].y);
+			if(i != j && distance > getEpsilonNodeRadius() && distance <= getNodeRadius()) //R_epsilon excluded
+			{
+				idx.push_back(y_index + j - getUsrsNum());
+				coef.push_back(getInterference(j,i));
+
+				///bigMMultiplyCounter++;
+				bigM+= getInterference(j,i);
+			}
+		}
+
+		///bigMMultiplyCounter = min(bigMMultiplyCounter+1, getDrnsNum());
+
+		// sum Aji su V v 1.5
+
+		for(int j = 0; j < getUsrsNum(); j++) // V
+		{
+			double distance = getDistance(mapGrid[i].x, mapGrid[i].y, mapGrid[j].x, mapGrid[j].y);
+			if(i != j && distance <= getNodeRadius()) //1.5 mod
+			{
+				rhs-= getInterference(j,i);
+
+				///bigMMultiplyCounter++; 
+				bigM+= getInterference(j,i);
+			}
+		}
+
+		///bigM = bigMMultiplyCounter * reductionFactor; //set the big M value for each specific constraint
+		bigM += 100;
+
+		rhs+= reductionFactor;
+
+		// Smax+(M-Smax)(supera_i + 1 - y_i)
+
+		idx.push_back(supera_index + i);
+		coef.push_back(-(bigM - reductionFactor));
+
+
+		snprintf(name, NAME_SIZE, "c6_%d", rowNumber); //numerazione progressiva dei vincoli
+		char* rowname = (char*)(&name[0]);
+		rowNumber++;
+
+		CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idx.size(), &rhs, &sense, &matbeg, &idx[0], &coef[0], NULL, &rowname);
+		idx.clear();
+		coef.clear();
+
+	}
+
+	// 7. s_i >= S_max (z_i +y_i -1) 1.5
+
+	sense = 'G'; 
+	matbeg = 0;
+	coef.clear();
+	idx.clear();
+	for( int i = getUsrsNum(); i < getTotalPotentialNodes(); i++)  // P
+	{
+		double rhs = 0.0;
+		// sconto
+		idx.push_back(s_index + i);
+		coef.push_back(1.0);
+
+		// fattore riduzione subordinato a area critica (epsilon)
+		idx.push_back(z_index + i);
+		coef.push_back(-reductionFactor);
+
+		// Smax * y_i
+		idx.push_back(y_index + i - getUsrsNum());
+		coef.push_back(-reductionFactor);
+
+		//rhs = - Smax
+		rhs = -reductionFactor;
+
+		snprintf(name, NAME_SIZE, "c7_%d", rowNumber); //numerazione progressiva dei vincoli
+		char* rowname = (char*)(&name[0]);
+		rowNumber++;
+
+
+		CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idx.size(), &rhs, &sense, &matbeg, &idx[0], &coef[0], NULL, &rowname);
+		idx.clear();
+		coef.clear();
+	}
+	//cout << "Vincoli (2) creati\n";
+
+	// 8. s_i >= S_max(o_i + y_i -1) 1.5
+
+	sense = 'G'; 
+	matbeg = 0;
+	coef.clear();
+	idx.clear();
+	for( int i = getUsrsNum(); i < getTotalPotentialNodes(); i++)  // P
+	{
+		double rhs = 0.0;
+		// sconto
+		idx.push_back(s_index + i);
+		coef.push_back(1.0);
+
+		// fattore riduzione subordinato a area critica (epsilon)
+		idx.push_back(supera_index + i);
+		coef.push_back(-reductionFactor);
+
+		// Smax * y_i
+		idx.push_back(y_index + i - getUsrsNum());
+		coef.push_back(-reductionFactor);
+
+		//rhs = - Smax
+		rhs = -reductionFactor;
+
+		snprintf(name, NAME_SIZE, "c8_%d", rowNumber); //numerazione progressiva dei vincoli
+		char* rowname = (char*)(&name[0]);
+		rowNumber++;
+
+
+		CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idx.size(), &rhs, &sense, &matbeg, &idx[0], &coef[0], NULL, &rowname);
+		idx.clear();
+		coef.clear();
+	}
+
+
+	// 9. s_i >= Sum(A_ji * y_j) + Sum(A_ji) - M ( 1 - y_i - z_i - o_i)   1.5
+
+	//bigM = 2 * reductionFactor; //set the big M value for each specific constraint
+	sense = 'G'; 
+	matbeg = 0;
+	coef.clear();
+	idx.clear();
+
+	for( int i = getUsrsNum(); i < getTotalPotentialNodes(); i++) // P
+	{
+		double rhs = 0;
+		///int bigMMultiplyCounter = 0;
+		bigM = 0.0;
+
+		// sconto_i
+		idx.push_back(s_index + i);
+		coef.push_back(1.0);
+
+		// sum Aji * y_j su P
+		for(int j = getUsrsNum(); j < getTotalPotentialNodes(); j++) // P
+		{
+			double distance = getDistance(mapGrid[i].x, mapGrid[i].y, mapGrid[j].x, mapGrid[j].y);
+			if(i != j && distance > getEpsilonNodeRadius() && distance <= getNodeRadius()) //R_epsilon excluded
+			{
+				idx.push_back(y_index + j - getUsrsNum());
+				coef.push_back(-getInterference(j,i));
+
+				bigM += getInterference(j,i);
+				///bigMMultiplyCounter++;
+			}
+		}
+
+		///bigMMultiplyCounter = min(bigMMultiplyCounter+1, getDrnsNum());
+
+		// sum Aji su V su range aumentato
+		for(int j = 0; j < getUsrsNum(); j++) // V
+		{
+			double distance = getDistance(mapGrid[i].x, mapGrid[i].y, mapGrid[j].x, mapGrid[j].y);
+			if(i != j && distance <= getNodeRadius()) // 1.5 mod
+			{
+				rhs+= getInterference(j,i);
+
+				///bigMMultiplyCounter++;
+				bigM+= getInterference(j,i);
+			}
+		}
+
+		bigM+= 100; //final bigM value 
+		///bigM = bigMMultiplyCounter * reductionFactor; //set the big M value for each specific constraint
+		
+		// -M(1 - y_i - z_i - o_i)
+
+		// -M 
+		rhs-= bigM;
+
+		// -M * (-y_i)
+		idx.push_back(y_index + i - getUsrsNum());
+		coef.push_back(- bigM);
+
+
+		// -M * (+o_i)
+		idx.push_back(supera_index + i);
+		coef.push_back( bigM);
+
+		// -M * (+z_i)
+		idx.push_back(z_index + i);
+		coef.push_back( bigM);
+
+		snprintf(name, NAME_SIZE, "c9_%d", rowNumber); //numerazione progressiva dei vincoli
+		char* rowname = (char*)(&name[0]);
+		rowNumber++;
+
+		CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idx.size(), &rhs, &sense, &matbeg, &idx[0], &coef[0], NULL, &rowname);
+		idx.clear();
+		coef.clear();
+	}
+
 
 	// 2. vers 1.0  Sum(f_ijk) <= M * x_ij (12)
 	//bigM = max(getRXCapacity(),getTXCapacity()); 
 
 	//set the big M value for each specific constraint
-	bigM = 0;
+	/*bigM = 0;
 	for(int i = 0; i < getUsrsNum(); i++)
 	{
 		for(int j = 0; j < getUsrsNum(); j++)
@@ -585,17 +821,31 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 			idx.clear();
 			coef.clear();
 		}
-	}
+	}*/
 
 	// 2. Legame tra le variabili f_i_j_k e y_i
 
-	//vers. 1.1
+	//vers. 1.5
 	//2.a
-	/*bigM = max(getRXCapacity(),getTXCapacity()); //set the big M value for each specific constraint
+	/*bigM = 0; //max(getRXCapacity(),getTXCapacity()); //set the big M value for each specific constraint
 	sense = 'L';
 	matbeg = 0;
 	idx.clear();
 	coef.clear();
+
+	for(int i = 0; i < getUsrsNum(); i++)
+	{
+		for(int j = 0; j < getUsrsNum(); j++)
+		{
+			if(i != j)
+			{
+				int trf = getRequestedTraffic(i,j);
+				if(trf > 0)
+					bigM += trf;  //total bigM = sum of total traffic matrix
+			}
+		}
+	}
+	bigM += 1;
 
 	for (int i = getUsrsNum(); i < getTotalPotentialNodes(); i++) // P
 	{
@@ -610,10 +860,13 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 					idx.push_back(fMap[i][j][k]);
 					coef.push_back(1.0);
 
-					idx.push_back(y_index + i - getUsrsNum());
-					coef.push_back(-bigM);
 
-					snprintf(name, NAME_SIZE, "c12_%d", rowNumber); //numerazione progressiva dei vincoli
+					
+
+					idx.push_back(y_index + i - getUsrsNum());
+					coef.push_back(-bigM); // bigM
+
+					snprintf(name, NAME_SIZE, "c2.a_%d", rowNumber); //numerazione progressiva dei vincoli
 					char* rowname = (char*)(&name[0]);
 					rowNumber++;
 	
@@ -623,10 +876,10 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 				}
 			}
 		}
-	}
+	}*/
 
 	//2.b
-	for (int i = 0; i < getTotalPotentialNodes(); i++) // V'
+	/*for (int i = 0; i < getTotalPotentialNodes(); i++) // V'
 	{
 		for (int j = getUsrsNum(); j < getTotalPotentialNodes(); j++) // P
 		{
@@ -642,7 +895,7 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 					idx.push_back(y_index + j - getUsrsNum());
 					coef.push_back(-bigM);
 
-					snprintf(name, NAME_SIZE, "c12_%d", rowNumber); //numerazione progressiva dei vincoli
+					snprintf(name, NAME_SIZE, "c2.b_%d", rowNumber); //numerazione progressiva dei vincoli
 					char* rowname = (char*)(&name[0]);
 					rowNumber++;
 	
@@ -728,7 +981,7 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 
 
 	// 3. legame tra variabili x_i_j e y_j (9)
-	sense = 'L';
+	/*sense = 'L';
 	matbeg = 0;
 	coef.clear();
 	idx.clear();
@@ -767,7 +1020,7 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 				coef.clear();
 			}
 		}
-	}
+	}*/
 
 	//cout << "Vincoli (3) creati\n";
 
@@ -793,47 +1046,11 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 
 	//cout << "Vincoli (4) creati\n";
 
-	// 5.  Sum(f_jik) <= U_rx * y_i - s_i  (1)
-	sense = 'L'; 
-	matbeg = 0;
-	coef.clear();
-	idx.clear();
-	for(int i = getUsrsNum(); i < getTotalPotentialNodes(); i++) // P
-	{
-		// sommatoria f_j_i_k
-		for(int j = 0; j < getTotalPotentialNodes(); j++)  // V'
-		{
-			for (int k = 0; k < getCommsNum(); k++)  // K
-			{
-				if (i != j && fMap[j][i][k] != -1) // f_j_i_k esiste
-				{
-					idx.push_back(fMap[j][i][k]);
-					coef.push_back(1.0);
-				}
-			}
-		}
-
-		// Urx * y_i
-		idx.push_back(y_index + i - getUsrsNum()); //y_i
-		coef.push_back(-getRXCapacity());
-
-		// sconto s_i
-		idx.push_back(s_index + i);
-		coef.push_back(1.0);
-
-		snprintf(name, NAME_SIZE, "c5_%d", rowNumber); //numerazione progressiva dei vincoli
-		char* rowname = (char*)(&name[0]);
-		rowNumber++;
-
-		CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idx.size(), &zero, &sense, &matbeg, &idx[0], &coef[0], NULL, &rowname);
-		idx.clear();
-		coef.clear();
-	}	
-	//cout << "Vincoli (5) creati\n";
+	
 
 	// 5.a Sum(f_jik) <= U_rx - s_i
 
-	sense = 'L'; 
+	/*sense = 'L'; 
 	matbeg = 0;
 	coef.clear();
 	idx.clear();
@@ -866,41 +1083,15 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 		CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idx.size(), &rhs, &sense, &matbeg, &idx[0], &coef[0], NULL, &rowname);
 		idx.clear();
 		coef.clear();
-	}
+	}*/
 	//cout << "Vincoli (5.a) creati\n";
 
-	// 6. s_i >= S_max * z_i (2)
-
-	sense = 'G'; 
-	matbeg = 0;
-	coef.clear();
-	idx.clear();
-	for( int i = 0; i < getTotalPotentialNodes(); i++)  // V'
-	{
-		double rhs = 0.0;
-		// sconto
-		idx.push_back(s_index + i);
-		coef.push_back(1.0);
-
-		// fattore riduzione subordinato a area critica (epsilon)
-		idx.push_back(z_index + i);
-		coef.push_back(-reductionFactor);
-
-		snprintf(name, NAME_SIZE, "c6_%d", rowNumber); //numerazione progressiva dei vincoli
-		char* rowname = (char*)(&name[0]);
-		rowNumber++;
-
-
-		CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idx.size(), &rhs, &sense, &matbeg, &idx[0], &coef[0], NULL, &rowname);
-		idx.clear();
-		coef.clear();
-	}
-	//cout << "Vincoli (2) creati\n";
+	
 
 	// 7. vers. 1.0 aggregata (6)
 
 	//bigM = 2 * getTotalPotentialNodes(); 
-	matbeg = 0;
+	/*matbeg = 0;
 	coef.clear();
 	idx.clear();
 	for(int i = getUsrsNum(); i < getTotalPotentialNodes(); i++)  // P
@@ -977,12 +1168,12 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 			idx.clear();
 			coef.clear();
 		}
-	}
+	}*/
 	
 	
 	//7.a TODO: test
 	//bigM = 2 * getTotalPotentialNodes(); //set the big M value for each specific constraint
-	sense = 'L'; 
+	/*sense = 'L'; 
 	matbeg = 0;
 	coef.clear();
 	idx.clear();
@@ -1011,7 +1202,9 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 			idx.clear();
 			coef.clear();
 		}
-	}
+	}*/
+
+	
 
 
 	// 7. versione 1.1 non aggregata
@@ -1046,8 +1239,8 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 				}
 			}
 		}
-	}
-
+	}*/
+/*
 	int criticalAreaCounter = 0;
 	for(int i = getUsrsNum(); i < getTotalPotentialNodes(); i++)  // P
 	{
@@ -1078,82 +1271,14 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 
 	//cout << "Vincoli (6) creati\n";
 
-	// 8. s_i >= Sum(A_ji * y_j) + Sum(A_ji) - M (sp_i + 1 - y_i)   (3)
-
-	//bigM = 2 * reductionFactor; //set the big M value for each specific constraint
-	sense = 'G'; 
-	matbeg = 0;
-	coef.clear();
-	idx.clear();
-
-	for( int i = getUsrsNum(); i < getTotalPotentialNodes(); i++) // P
-	{
-		double rhs = 0;
-		///int bigMMultiplyCounter = 0;
-		bigM = 0.0;
-
-		// sconto_i
-		idx.push_back(s_index + i);
-		coef.push_back(1.0);
-
-		// sum Aji * y_j su P
-		for(int j = getUsrsNum(); j < getTotalPotentialNodes(); j++) // P
-		{
-			double distance = getDistance(mapGrid[i].x, mapGrid[i].y, mapGrid[j].x, mapGrid[j].y);
-			if(i != j && distance > getEpsilonNodeRadius() && distance <= getNodeRadius()) //R_epsilon excluded
-			{
-				idx.push_back(y_index + j - getUsrsNum());
-				coef.push_back(-getInterference(j,i));
-
-				bigM += getInterference(j,i);
-				///bigMMultiplyCounter++;
-			}
-		}
-
-		///bigMMultiplyCounter = min(bigMMultiplyCounter+1, getDrnsNum());
-
-		// sum Aji * y_j su V
-		for(int j = 0; j < getUsrsNum(); j++) // V
-		{
-			double distance = getDistance(mapGrid[i].x, mapGrid[i].y, mapGrid[j].x, mapGrid[j].y);
-			if(i != j && distance > getEpsilonNodeRadius() && distance <= getNodeRadius()) //R_epsilon excluded
-			{
-				rhs+= getInterference(j,i);
-
-				///bigMMultiplyCounter++;
-				bigM+= getInterference(j,i);
-			}
-		}
-
-		bigM += 100; //final bigM value 
-		///bigM = bigMMultiplyCounter * reductionFactor; //set the big M value for each specific constraint
-		// -M(supera_i + 1 - y_i)
-
-		idx.push_back(supera_index + i);
-		coef.push_back(bigM);
-
-
-		rhs-= bigM;
-
-		idx.push_back(y_index + i - getUsrsNum());
-		coef.push_back(- bigM);
-
-
-		snprintf(name, NAME_SIZE, "c8_%d", rowNumber); //numerazione progressiva dei vincoli
-		char* rowname = (char*)(&name[0]);
-		rowNumber++;
-
-		CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idx.size(), &rhs, &sense, &matbeg, &idx[0], &coef[0], NULL, &rowname);
-		idx.clear();
-		coef.clear();
-	}
+	
 	//cout << "Vincoli (3) creati\n";
 
 
 	// 8.a si >= Sum(A_ji * y_j) - M * sp_i
 
 	//bigM = 2 * reductionFactor; //set the big M value for each specific constraint
-	sense = 'G'; 
+	/*sense = 'G'; 
 	matbeg = 0;
 	coef.clear();
 	idx.clear();
@@ -1198,84 +1323,16 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 		CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idx.size(), &zero, &sense, &matbeg, &idx[0], &coef[0], NULL, &rowname);
 		idx.clear();
 		coef.clear();
-	}
+	}*/
 	//cout << "Vincoli (3.a) creati\n";
 
-	// 9. Sum(A_ji * y_j) + Sum(A_ji) <= S_max + M (sp_i + 1 - y_i)   (4)
-
-	//bigM = 2 * reductionFactor; //set the big M value for each specific constraint
-	sense = 'L'; 
-	matbeg = 0;
-	coef.clear();
-	idx.clear();
-
-	for(int i = getUsrsNum(); i < getTotalPotentialNodes(); i++)  // P
-	{
-		double rhs = 0;
-		///int bigMMultiplyCounter = 0;
-		bigM = 0.0;
-
-		// sum Aji * y_j su P
-		for(int j = getUsrsNum(); j < getTotalPotentialNodes(); j++)  // P
-		{
-			double distance = getDistance(mapGrid[i].x, mapGrid[i].y, mapGrid[j].x, mapGrid[j].y);
-			if(i != j && distance > getEpsilonNodeRadius() && distance <= getNodeRadius()) //R_epsilon excluded
-			{
-				idx.push_back(y_index + j - getUsrsNum());
-				coef.push_back(getInterference(j,i));
-
-				///bigMMultiplyCounter++;
-				bigM+= getInterference(j,i);
-			}
-		}
-
-		///bigMMultiplyCounter = min(bigMMultiplyCounter+1, getDrnsNum());
-
-		// sum Aji su V
-
-		for(int j = 0; j < getUsrsNum(); j++) // V
-		{
-			double distance = getDistance(mapGrid[i].x, mapGrid[i].y, mapGrid[j].x, mapGrid[j].y);
-			if(i != j && distance > getEpsilonNodeRadius() && distance <= getNodeRadius()) //R_epsilon excluded
-			{
-				rhs-= getInterference(j,i);
-
-				///bigMMultiplyCounter++; 
-				bigM+= getInterference(j,i);
-			}
-		}
-
-		///bigM = bigMMultiplyCounter * reductionFactor; //set the big M value for each specific constraint
-		bigM += 100;
-
-		rhs+= reductionFactor;
-
-		// M(supera_i + 1 - y_i)
-
-		idx.push_back(supera_index + i);
-		coef.push_back(-bigM);
-
-		rhs+= bigM;
-
-		idx.push_back(y_index + i - getUsrsNum());
-		coef.push_back( bigM);
-
-
-		snprintf(name, NAME_SIZE, "c9_%d", rowNumber); //numerazione progressiva dei vincoli
-		char* rowname = (char*)(&name[0]);
-		rowNumber++;
-
-		CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idx.size(), &rhs, &sense, &matbeg, &idx[0], &coef[0], NULL, &rowname);
-		idx.clear();
-		coef.clear();
-
-	}
+	
 	//cout << "Vincoli (4) creati\n";
 
 	// 9.a Sum(A_ji * y_j) <= S_max + M * sp_i
 
 	//bigM = 2 * reductionFactor; //set the big M value for each specific constraint
-	sense = 'L'; 
+	/*sense = 'L'; 
 	matbeg = 0;
 	coef.clear();
 	idx.clear();
@@ -1324,13 +1381,13 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 		idx.clear();
 		coef.clear();
 
-	}
+	}*/
 	//cout << "Vincoli (4.a) creati\n";
 
-	// 10. s_i >= S_max * sp_i - M(1 - y_i)  (5)
+	// 9.a. s_i >= S_max * sp_i - M(1 - y_i)  (5)
 
-	bigM = 2 * reductionFactor; //set the big M value for each specific constraint
-	sense = 'G';
+	//bigM = 1.5 * reductionFactor; //set the big M value for each specific constraint
+	/*sense = 'G';
 	matbeg = 0;
 	coef.clear();
 	idx.clear();
@@ -1343,15 +1400,16 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 		idx.push_back(s_index + i);
 		coef.push_back(1.0);
 
-		// sconto * supera_i
+		// Smax (supera_i + y_i - 1)
 		idx.push_back(supera_index + i);
 		coef.push_back(-reductionFactor);
 
-		// -M(1-y_i)
-		rhs-= bigM;
-
 		idx.push_back(y_index + i - getUsrsNum());
-		coef.push_back(-bigM);
+		coef.push_back(-reductionFactor);
+
+		// -M(1-y_i)
+		rhs-= reductionFactor;
+
 
 		snprintf(name, NAME_SIZE, "c10_%d", rowNumber); //numerazione progressiva dei vincoli
 		char* rowname = (char*)(&name[0]);
@@ -1360,13 +1418,13 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 		CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idx.size(), &rhs, &sense, &matbeg, &idx[0], &coef[0], NULL, &rowname);
 		idx.clear();
 		coef.clear();
-	}
+	}*/
 
 	//cout << "Vincoli (5) creati\n";
 
 	// 10.a   s_i >= S_max * sp_i
 
-	sense = 'G';  
+	/*sense = 'G';  
 	matbeg = 0;
 	coef.clear();
 	idx.clear();
@@ -1388,50 +1446,15 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 		CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idx.size(), &zero, &sense, &matbeg, &idx[0], &coef[0], NULL, &rowname);
 		idx.clear();
 		coef.clear();
-	}
+	}*/
 	//cout << "Vincoli (5.a) creati\n";
 
-	// 11. gestione flussi TX, senza interferenza 1.1  Sum(Sum(f_ijk)) <= U_tx * y_i 
-	sense = 'L';
-	matbeg = 0;
-	coef.clear();
-	idx.clear();
-
-	for(int i = getUsrsNum(); i < getTotalPotentialNodes(); i++)  // P
-	{
-		// somma f_i_j_k (1)
-		for(int j = 0; j < getTotalPotentialNodes(); j++) // V'
-		{
-			for(int k = 0; k < getCommsNum(); k++)
-			{
-				if (i != j && fMap[i][j][k] != -1)
-				{
-					idx.push_back(fMap[i][j][k]);
-					coef.push_back(1.0);
-				}
-			}
-		}
-
-		if(coef.size() > 0)
-		{
-			idx.push_back( y_index + i - getUsrsNum() );
-			coef.push_back( -getTXCapacity() );
-			//rhs = getTXCapacity() - rhs; 
-
-			snprintf(name, NAME_SIZE, "c11_%d", rowNumber); //numerazione progressiva dei vincoli
-			char* rowname = (char*)(&name[0]);
-			rowNumber++;
-
-			CHECKED_CPX_CALL(CPXaddrows, env, lp, 0, 1, idx.size(), &zero, &sense, &matbeg, &idx[0], &coef[0], NULL, &rowname);
-			idx.clear();
-			coef.clear();
-		}
-	}
+	
 	//cout << "Vincoli (7) creati\n";
 
 	//11.a gestione flussi TX, senza interferenza 1.1
 
-	sense = 'L';
+	/*sense = 'L';
 	matbeg = 0;
 	coef.clear();
 	idx.clear();
@@ -1464,7 +1487,7 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 			idx.clear();
 			coef.clear();
 		}
-	}
+	}*/
 
 	//11.  Gestione interferenza lato TX   (7)
 /*
@@ -1606,17 +1629,24 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 
 
 	//istanze speciali
+	//if(specialGrid == 25) || specialGrid == 41 || specialGrid == 48)
 
-	//btn25
-	//vector<int> noFlightZones {0,1,3,4,5,7,8,9,13,17,27,31,35,36,37,39,40,41,43,44};
-
-	//btn41
-	//vector<int> noFlightZones {0,1,4,5,6,7,8,9,10,11,12,13,14,15,20,21,22,23,24,25,26,28,29,36,37,40,44,60,65,66,67,68,69,70,74,75,76,79,80,81,82,83,84,85,86,88,89};
+	//btn25  CODE 25
+	vector<int> noFlightZones;
 	
-	//btn48
-	//vector<int> noFlightZones {3,4,24,26,27,28,29,31,32,34,35,36,37,39,59,60};
+	if(specialGrid == 25)
+		noFlightZones= {0,1,3,4,5,7,8,9,13,17,27,31,35,36,37,39,40,41,43,44};
 
-	/*for(int i=0; i< (int) noFlightZones.size(); i++)
+	//btn41 CODE 41
+	if(specialGrid == 41)
+		noFlightZones = {0,1,4,5,6,7,8,9,10,11,12,13,14,15,20,21,22,23,24,25,26,28,29,36,37,40,44,60,65,66,67,68,69,70,74,75,76,79,80,81,82,83,84,85,86,88,89};
+	
+	//btn48 CODE 48 
+	if(specialGrid == 48)
+		noFlightZones = {3,4,24,26,27,28,29,31,32,34,35,36,37,39,59,60};
+
+
+	for(int i=0; i< (int) noFlightZones.size(); i++)
 	{
 		noFlightZones[i]+= getUsrsNum();
 	}
@@ -1625,9 +1655,6 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 	vector <char> ub(1, 'U');
 	vector <double> zeros(1, 0.0);
 	 
-	
-		
-		
 	for(int i = 0 ; i< (int)noFlightZones.size(); i++)
 	{
 		int j=0;
@@ -1646,9 +1673,37 @@ static void setupLP(CEnv env, Prob lp, int contRelax[])
 		cout << "scelto offset: " << offset << endl;
 		int indY = y_index + offset ;
 		cout << "indY = " << indY << endl;
+
+		//fisso y_i
 		CHECKED_CPX_CALL(CPXchgbds, env, lp, 1, &indY, &lb[0], &zeros[0]);
-		CHECKED_CPX_CALL(CPXchgbds, env, lp, 1, &indY, &ub[0], &zeros[0]);
-	}*/
+		CHECKED_CPX_CALL(CPXchgbds, env, lp, 1, &indY, &ub[0], &zeros[0]); 
+	}
+		//fisso s_i
+		//int indS = s_index + noFlightZones[i] - getUsrsNum();
+		//CHECKED_CPX_CALL(CPXchgbds, env, lp, 1, &indS, &lb[0], &zeros[0]);
+		//CHECKED_CPX_CALL(CPXchgbds, env, lp, 1, &indS, &ub[0], &zeros[0]);
+		
+		//fisso z_i
+		//int indZ = z_index + noFlightZones[i] - getUsrsNum();
+		//CHECKED_CPX_CALL(CPXchgbds, env, lp, 1, &indZ, &lb[0], &zeros[0]);
+		//CHECKED_CPX_CALL(CPXchgbds, env, lp, 1, &indZ, &ub[0], &zeros[0]);
+		
+		//fisso o_i
+		//int ind_supera = supera_index + noFlightZones[i] - getUsrsNum();
+		//CHECKED_CPX_CALL(CPXchgbds, env, lp, 1, &ind_supera, &lb[0], &zeros[0]);
+		//CHECKED_CPX_CALL(CPXchgbds, env, lp, 1, &ind_supera, &ub[0], &zeros[0]);
+
+		//int index = noFlightZones[i] - getUsrsNum();
+		//for (int k = 0; k < getCommsNum(); k++)
+		//{
+			//for (int i = 0; i < getTotalPotentialNodes(); i++)
+			//{
+
+				//CHECKED_CPX_CALL(CPXchgbds, env, lp, 1, &fMap[index][i][k], &lb[0], &zeros[0]);
+				//CHECKED_CPX_CALL(CPXchgbds, env, lp, 1, &fMap[i][index][k], &ub[0], &zeros[0]);
+			//}
+		//}
+	//}
 	 
 	
 
@@ -1766,6 +1821,7 @@ solution_t *solveLP(CEnv env, Prob lp, string baseFileName, bool verbose, int co
 	
 	if(contRelax[0]!= 31) //MIP  LPOPT
 	{
+		cout << __FUNCTION__ <<"(): Esecuzione di CPXmipopt." << endl;
 		start = std::chrono::high_resolution_clock::now(); //timestamp di inizio
 			CHECKED_CPX_CALL(CPXmipopt, env, lp);
 		end = std::chrono::high_resolution_clock::now(); //timestamp di fine
@@ -1774,6 +1830,7 @@ solution_t *solveLP(CEnv env, Prob lp, string baseFileName, bool verbose, int co
 	{
 		swapToCont(env,lp);
 		//cout << "qui" << endl;
+		cout << __FUNCTION__ << "(): Esecuzione di CPXlpopt." << endl;
 		start = std::chrono::high_resolution_clock::now(); //timestamp di inizio
 			CHECKED_CPX_CALL(CPXlpopt, env, lp);
 		end = std::chrono::high_resolution_clock::now(); //timestamp di fine
@@ -1808,6 +1865,30 @@ solution_t *solveLP(CEnv env, Prob lp, string baseFileName, bool verbose, int co
 		solution->statusCode = CPXgetstat(env, lp);
 		solution->execTime = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 		solution->openedNodes = CPXgetnodecnt(env,lp);
+
+		double bestobj = 0;
+		CPXgetbestobjval(env, lp, &bestobj);
+
+		solution->bestobj = bestobj;
+
+		double cutoff = 0;
+		CPXgetcutoff(env, lp, &cutoff);
+
+		solution->cutoff = cutoff;
+
+		double gap = 0;
+		CPXgetmiprelgap(env, lp, &gap);
+
+		solution->gap = gap;
+
+		solution->nodeint = CPXgetnodeint(env, lp);
+
+		int cuts = 0;
+		int cuttype = 0;
+		CPXgetnumcuts(env, lp, cuttype, &cuts);
+
+		solution->cuts = cuts;
+
 
 		int status = CPXgetx(env, lp, solutionArray, y_index, y_index + getTotalPotentialNodes() - getUsrsNum() - 1);
 		if (status == 0)
@@ -2367,7 +2448,16 @@ void printSimplifiedSolFile(CEnv env, Prob lp, const char* solution)
 
 void swapToInt(CEnv env, Prob lp)
 {
+	cout << "Swapping problem configuration from LP to MIP." << endl;
+	double lb = -1;
+	int status = CPXgetlb(env, lp, &lb, f_index , f_index );
+	cout <<"LB f LP: " << lb << endl;
+
 	CPXchgprobtype (env, lp, CPXPROB_MILP);//LPOPT
+
+	lb = -1;
+	status = CPXgetlb(env, lp, &lb, f_index , f_index );
+	cout <<"LB f MIP: " << lb << endl;
 	
 	vector <char> ynewType(numyVars, 'B');
 	vector <char> xnewType(numxVars, 'B');
@@ -2416,9 +2506,24 @@ void swapToCont(CEnv env, Prob lp)
 	CHECKED_CPX_CALL(CPXchgctype, env, lp, numxVars, &xIDX[0], &xnewType[0]);
 	CHECKED_CPX_CALL(CPXchgctype, env, lp, numzVars, &zIDX[0], &znewType[0]);
 	CHECKED_CPX_CALL(CPXchgctype, env, lp, numsuperaVars, &superaIDX[0], &superanewType[0]);*/
-	
-	
+	cout << "Swapping problem configuration from MIP to LP." << endl;
+	double lb = -1;
+	int status = CPXgetlb(env, lp, &lb, f_index , f_index );
+	cout <<"LB f MIP: " << lb << endl;
+
 	CPXchgprobtype (env, lp, CPXPROB_LP) ;//LPOPT 
+
+	lb = -1;
+	status = CPXgetlb(env, lp, &lb, f_index , f_index );
+	cout <<"LB f LP: " << lb << endl;
+
+	vector <double> zeros(fIDX.size(), 0);
+	vector <char> lbl(max(xIDX.size(), fIDX.size()), 'L');
+	CHECKED_CPX_CALL(CPXchgbds, env, lp, fIDX.size(), &fIDX[0], &lbl[0], &zeros[0]);
+
+	lb = -1;
+	status = CPXgetlb(env, lp, &lb, f_index , f_index );
+	cout <<"LB f forced: " << lb << endl;
 }
 
 int dronesCount(solution_t *sol, double threshold)

@@ -46,5 +46,6 @@ void findBestNeighbor(move);
 solution_t *executeHeurInstance(std::string, bool, int[]);
 solution_t *startingSolution(CEnv,Prob,std::string,int[]);
 solution_t *solve(CEnv,Prob,std::string,bool);
-solution_t *solve2(CEnv,Prob,std::string,bool);
+solution_t *solve2(Env,Prob,std::string,bool);
+solution_t *solve3(Env,Prob,std::string,bool);
 #endif

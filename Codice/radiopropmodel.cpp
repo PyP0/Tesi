@@ -17,6 +17,7 @@ double lambda = 0.06;
 //double rxThresh = 6.42514e-10; //0.5 @100m @5GHz DATASET2 
 //double rxThresh = 1.02802e-10; //0.5 @250m @5GHz DATASET
 double rxThresh = 2.57006e-09; //0.5 @50m @5GHz DATASET3
+//double rxThresh = 2.0224e-08; //0.7 @14m @5GHz DATASETlasthope
 
 
 double getRXThresh()

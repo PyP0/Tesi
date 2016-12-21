@@ -125,10 +125,10 @@ int getDrnsNum()
 	return d;
 }
 
-/*int getPosNum()
+int getPosNum()
 {
 	return P;
-}*/
+}
 
 int getCommsNum()
 {
@@ -226,7 +226,7 @@ double getWCInterferencePercentage()
 	return ( (2.0 * e) - 1.0) / (2.0 * e);
 
 }
-double getReductionFactor()
+double getReductionFactor() //Smax
 {
 	return getRXCapacity() * getWCInterferencePercentage();
 } 

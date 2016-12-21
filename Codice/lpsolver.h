@@ -19,11 +19,24 @@ struct solution_t
 	unsigned long int openedNodes;
 	double rootGap;
 
+	double bestobj;
+	double cutoff;
+	double gap;
+	int nodeint;
+	int cuts;
+
 	int heurIterationCount;
+
+
 
 };
 
 int gety_index();
+int getz_index();
+int gets_index();
+int getsupera_index();
+
+void setSpecialGrid(int);
 
 solution_t *getSolution(CEnv,Prob,unsigned long int,std::string);
 
